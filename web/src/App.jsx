@@ -1,63 +1,36 @@
-import { useEffect, useState } from "react";
-import { onAuthStateChanged, signInWithPopup, GoogleAuthProvider } from "firebase/auth";
-import { collection, getDocs } from "firebase/firestore";
-import { auth, db } from "./firebase";
+import { useState } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Navigate,
+} from "react-router-dom";
+
+import Navbar from "./components/NavBar";
+import Home from "./pages/Home";
+import Login from "./pages/Login";
+import UserPage from "./pages/UserPage";
+import RestaurantPage from "./pages/RestaurantPage";
+import CourierPage from "./pages/CourierPage";
 
 function App() {
-  const [user, setUser] = useState(null);
-  const [restaurants, setRestaurants] = useState([]);
-  const [count, setCount] = useState(0)
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
-    return () => unsub();
-  }, []);
-
-  useEffect(() => {
-    if (user) {
-      (async () => {
-        const snap = await getDocs(collection(db, "restaurants"));
-        setRestaurants(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      })();
-    }
-  }, [user]);
-
-  const login = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
-  };
-
-  if (!user) {
-    return (
-      <div className="p-6">
-        <h1 className="text-2xl font-bold">Local Food Delivery</h1>
-        <button onClick={login} className="mt-4 bg-blue-500 text-white px-4 py-2 rounded">
-          Sign in with Google
-        </button>
-        <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-      </div>
-      </div>
-    );
-  }
+  const [role, setRole] = useState(null);
 
   return (
-    
-    <div className="p-6">
-      <h1 className="text-2xl font-bold">Welcome, {user.displayName}</h1>
-      <h2 className="mt-4 text-xl">Nearby Restaurants</h2>
-      <ul className="mt-2 space-y-2">
-        {restaurants.map((r) => (
-          <li key={r.id} className="border p-2 rounded shadow">
-            <h3 className="font-semibold">{r.name}</h3>
-            <p>{r.description}</p>
-          </li>
-        ))}
-      </ul>
-    </div>
-    
+    <Router>
+      <div className="flex flex-col min-h-screen">
+        <Navbar onSelectRole={setRole} />
+          <div className="page-container">
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/login" element={<Login role={role} />} />
+              <Route path="/user" element={<UserPage />} />
+              <Route path="/restaurant" element={<RestaurantPage />} />
+              <Route path="/courier" element={<CourierPage />} />
+            </Routes>
+          </div>
+      </div>
+    </Router>
   );
 }
 
