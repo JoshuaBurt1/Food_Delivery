@@ -9,6 +9,8 @@ export default function Login({ role }) {
     const provider = new GoogleAuthProvider();
     try {
       await signInWithPopup(auth, provider);
+      console.log("User is:", auth.currentUser);
+      console.log("Role is:", role);
       navigate(`/${role}`);
     } catch (error) {
       console.error("Login failed", error);
