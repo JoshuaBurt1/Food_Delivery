@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../firebase"; // ✅ Make sure this path is correct
+import { auth } from "../firebase";
+import Logo from "../components/Logo"; // ✅ Import the logo component
 import "../index.css";
 
 export default function NavBar({ onSelectRole }) {
   const [isOpen, setIsOpen] = useState(false);
-  const [user, setUser] = useState(null); // ✅ Track the logged-in user
+  const [user, setUser] = useState(null);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
 
@@ -16,7 +17,6 @@ export default function NavBar({ onSelectRole }) {
     { label: "Courier", value: "courier" },
   ];
 
-  // ✅ Listen for auth state changes
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
@@ -24,7 +24,6 @@ export default function NavBar({ onSelectRole }) {
     return () => unsubscribe();
   }, []);
 
-  // ✅ Logout handler
   const handleLogout = async () => {
     try {
       await signOut(auth);
@@ -37,10 +36,8 @@ export default function NavBar({ onSelectRole }) {
     }
   };
 
-  // Toggle dropdown open/close
   const toggleDropdown = () => setIsOpen((prev) => !prev);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClickOutside(event) {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
@@ -51,7 +48,6 @@ export default function NavBar({ onSelectRole }) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  // Handle selecting a role
   const handleRoleClick = (value) => {
     onSelectRole(value);
     navigate("/login");
@@ -60,39 +56,41 @@ export default function NavBar({ onSelectRole }) {
 
   return (
     <div className="navbar">
-      <Link to="/" className="nav-home-link">
-        Home
-      </Link>
+      <div className="nav-left">
+        {user ? (
+          <div className="nav-user-info">
+            <span className="user-display-name">
+              👤 {user.displayName || user.email}
+            </span>
+            <button onClick={handleLogout} className="logout-button">
+              Logout
+            </button>
+          </div>
+        ) : (
+          <div className="dropdown" ref={dropdownRef}>
+            <button className="dropdown-button" onClick={toggleDropdown}>
+              Login as: <span className="arrow">▾</span>
+            </button>
+            {isOpen && (
+              <ul className="dropdown-menu">
+                {roles.map((role) => (
+                  <li
+                    key={role.value}
+                    className="dropdown-item"
+                    onClick={() => handleRoleClick(role.value)}
+                  >
+                    {role.label}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
-      {user ? (
-        <div className="nav-user-info">
-          <span className="user-display-name">
-            👤 {user.displayName || user.email}
-          </span>
-          <button onClick={handleLogout} className="logout-button">
-            Logout
-          </button>
-        </div>
-      ) : (
-        <div className="dropdown" ref={dropdownRef}>
-          <button className="dropdown-button" onClick={toggleDropdown}>
-            Login as: <span className="arrow">▾</span>
-          </button>
-          {isOpen && (
-            <ul className="dropdown-menu">
-              {roles.map((role) => (
-                <li
-                  key={role.value}
-                  className="dropdown-item"
-                  onClick={() => handleRoleClick(role.value)}
-                >
-                  {role.label}
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      )}
+      <div className="nav-right">
+        <Logo width={100} />
+      </div>
     </div>
   );
 }

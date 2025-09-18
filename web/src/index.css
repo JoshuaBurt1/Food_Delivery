@@ -81,12 +81,26 @@ button:focus-visible {
 }
 
 /* Navbar container */
+/* Updated Navbar container */
 .navbar {
+  display: flex;
+  justify-content: space-between; /* Push left and right sections apart */
+  align-items: center;
+  padding: 20px;
+  background-color: #f8f8f8;
+}
+
+/* Optional spacing between elements inside left section */
+.nav-left {
   display: flex;
   align-items: center;
   gap: 20px;
-  padding: 20px;
-  background-color: #f8f8f8;
+}
+
+/* Right section for logo */
+.nav-right {
+  display: flex;
+  align-items: center;
 }
 
 /* Home link styling */
@@ -154,5 +168,6 @@ button:focus-visible {
 }
 
 .user-display-name{
+    margin-right: 10px;
     color: #333;
 }
