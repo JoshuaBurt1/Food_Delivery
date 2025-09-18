@@ -5,17 +5,17 @@ import { Navigate } from "react-router-dom";
 
 export default function RestaurantPage() {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true); // ✅ Add loading state
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setLoading(false); // ✅ Stop loading once auth is checked
+      setLoading(false);
     });
     return () => unsub();
   }, []);
 
-  if (loading) return <div>Loading...</div>; // ✅ Prevent redirect flicker
+  if (loading) return <div>Loading...</div>;
 
   if (!user) return <Navigate to="/login" />;
 
