@@ -18,7 +18,7 @@ export default function Login({ role }) {
   };
 
   // This handles missing role properly during initial render
-  if (!role) return <Navigate to="/" />;
+  if (!role) return <Navigate to="/login" />;
 
   return (
     <div className="p-6">
