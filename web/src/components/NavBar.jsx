@@ -28,8 +28,10 @@ export default function NavBar({ onSelectRole }) {
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      setUser(null);           // Clear local state
-      navigate("/");           // Redirect to home or login
+      localStorage.removeItem("selectedRole");
+      onSelectRole(null);
+      setUser(null);
+      navigate("/");
     } catch (error) {
       console.error("Logout failed", error);
     }

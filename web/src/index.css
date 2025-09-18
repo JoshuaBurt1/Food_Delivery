@@ -152,3 +152,7 @@ button:focus-visible {
 .login {
     color: #333;
 }
+
+.user-display-name{
+    color: #333;
+}

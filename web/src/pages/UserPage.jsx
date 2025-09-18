@@ -6,10 +6,14 @@ import { Navigate } from "react-router-dom";
 
 export default function UserPage() {
   const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);  // new loading state
   const [restaurants, setRestaurants] = useState([]);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => setUser(u));
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      setLoading(false);  // done loading once auth state known
+    });
     return () => unsub();
   }, []);
 
@@ -21,6 +25,10 @@ export default function UserPage() {
       })();
     }
   }, [user]);
+
+  if (loading) {
+    return <div>Loading...</div>;  // show loading UI until auth is known
+  }
 
   if (!user) return <Navigate to="/login" />;
 

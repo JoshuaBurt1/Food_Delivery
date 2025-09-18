@@ -14,7 +14,7 @@ import RestaurantPage from "./pages/RestaurantPage";
 import CourierPage from "./pages/CourierPage";
 
 function App() {
-  const [role, setRole] = useState(null);
+  const [role, setRole] = useState(() => localStorage.getItem("selectedRole") || null);
 
   return (
     <Router>
