@@ -17,15 +17,47 @@ export default function CourierPage() {
   const [courierData, setCourierData] = useState(null);
   const [fetchingCourier, setFetchingCourier] = useState(true);
   const [error, setError] = useState("");
-  const locationQueue = useRef(null);  // To hold latest location to update
-  const throttleTimeout = useRef(null); // Throttle timer
+  const [locationAccessDenied, setLocationAccessDenied] = useState(false);
+  const locationQueue = useRef(null);
+  const throttleTimeout = useRef(null);
+  const courierDataRef = useRef(courierData);
+  useEffect(() => {
+    courierDataRef.current = courierData;
+  }, [courierData]);
+
+  // Helper: Update courier status in Firestore and state
+  const updateCourierStatus = async (status) => {
+    if (!courierData?.id) return;
+    const courierDocRef = doc(db, "couriers", courierData.id);
+    try {
+      await updateDoc(courierDocRef, { status });
+      setCourierData((prev) => ({ ...prev, status }));
+    } catch (err) {
+      console.error("Failed to update status:", err);
+      setError("Failed to update status.");
+    }
+  };
+
+  // Helper: Returns a user-friendly location error message based on code
+  const getLocationErrorMessage = (code) => {
+    switch (code) {
+      case 1:
+        return "Location access was denied. Please enable location services to continue.";
+      case 2:
+        return "Location information is unavailable. Check your device settings.";
+      case 3:
+        return "Location request timed out. Try again with a stronger signal.";
+      default:
+        return "Unable to access location.";
+    }
+  };
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (u) => {
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
       setLoadingAuth(false);
     });
-    return () => unsub();
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -49,31 +81,51 @@ export default function CourierPage() {
         if (matchedDoc) {
           setCourierData({ id: matchedDoc.id, ...matchedDoc.data() });
           setFetchingCourier(false);
-        } else {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              const { latitude, longitude } = position.coords;
-
-              const newCourier = {
-                email: user.email,
-                name: user.displayName || "Unnamed Courier",
-                earnings: 0,
-                location: new GeoPoint(latitude, longitude),
-                status: "active",
-              };
-
-              const docRef = await addDoc(couriersRef, newCourier);
-              await updateDoc(docRef, { courierId: docRef.id });
-              setCourierData({ id: docRef.id, courierId: docRef.id, ...newCourier });
-              setFetchingCourier(false);
-            },
-            (err) => {
-              console.error("Location error", err);
-              setError("Location access denied. Cannot create profile.");
-              setFetchingCourier(false);
-            }
-          );
+          return;
         }
+
+        if (!navigator.geolocation) {
+          setError(
+            "Location services are unavailable on your device. Please enable location access to resume courier capabilities."
+          );
+          setFetchingCourier(false);
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          async (position) => {
+            const { latitude, longitude } = position.coords;
+
+            const newCourier = {
+              email: user.email,
+              name: user.displayName || "Unnamed Courier",
+              earnings: 0,
+              location: new GeoPoint(latitude, longitude),
+              status: "inactive",
+            };
+
+            const docRef = await addDoc(couriersRef, newCourier);
+            await updateDoc(docRef, { courierId: docRef.id });
+
+            setCourierData({ id: docRef.id, courierId: docRef.id, ...newCourier });
+            setFetchingCourier(false);
+          },
+          (err) => {
+            console.error("Location error", err);
+            const message = getLocationErrorMessage(err.code);
+            setError(message);
+
+            if (err.code === 1) {
+              setLocationAccessDenied(true);
+            }
+
+            if (courierData?.id && courierData.status !== "inactive") {
+              updateCourierStatus("inactive");
+            }
+
+            setFetchingCourier(false);
+          }
+        );
       } catch (err) {
         console.error("Error fetching or creating courier:", err);
         setError("Something went wrong.");
@@ -84,7 +136,7 @@ export default function CourierPage() {
     fetchOrCreateCourier();
   }, [user]);
 
-  // Throttled active location tracking
+  // Throttled location tracking
   useEffect(() => {
     if (!courierData?.id) return;
 
@@ -97,6 +149,16 @@ export default function CourierPage() {
         });
       } catch (err) {
         console.error("Failed to update location:", err);
+      }
+    };
+
+    const updateCourierStatus = async (status) => {
+      try {
+        await updateDoc(courierDocRef, { status });
+        setCourierData((prev) => ({ ...prev, status }));
+      } catch (err) {
+        console.error("Failed to update status:", err);
+        setError("Failed to update status.");
       }
     };
 
@@ -113,39 +175,55 @@ export default function CourierPage() {
       (position) => {
         const { latitude, longitude } = position.coords;
 
-        // Update UI immediately
         setCourierData((prev) => ({
           ...prev,
           location: { latitude, longitude },
         }));
 
-        // Queue location update
         locationQueue.current = { latitude, longitude };
 
-        // If no timeout scheduled, schedule one now
         if (!throttleTimeout.current) {
-          throttleTimeout.current = setTimeout(throttleUpdate, 10000); // 10 seconds throttle
+          throttleTimeout.current = setTimeout(throttleUpdate, 10000);
+        }
+
+        // If location access was previously denied, reset error and flag
+        if (locationAccessDenied) {
+          setLocationAccessDenied(false);
+          setError("");
         }
       },
       (err) => {
         console.error("Error watching location:", err);
         setError("Unable to update location.");
+
+        if (err.code === 1) {
+          setLocationAccessDenied(true);
+
+          // Only update status if currently active (prevent redundant writes)
+          if (courierDataRef.current?.status !== "inactive") {
+            updateCourierStatus("inactive");
+          }
+        }
       },
-      {
-        enableHighAccuracy: true,
-        maximumAge: 5000,
-        timeout: 10000,
-      }
+      { enableHighAccuracy: true, maximumAge: 5000, timeout: 10000 }
     );
 
     return () => {
       navigator.geolocation.clearWatch(watcherId);
-      if (throttleTimeout.current) clearTimeout(throttleTimeout.current);
+      if (throttleTimeout.current) {
+        clearTimeout(throttleTimeout.current);
+        throttleTimeout.current = null;
+      }
     };
-  }, [courierData?.id]);
+  }, [courierData?.id, locationAccessDenied]);
 
   if (loadingAuth) return <div>Loading authentication...</div>;
   if (!user) return <Navigate to="/login" />;
+
+  const toggleStatus = () => {
+    if (!courierData?.id || locationAccessDenied) return;
+    updateCourierStatus(courierData.status === "active" ? "inactive" : "active");
+  };
 
   return (
     <div className="p-6">
@@ -184,6 +262,21 @@ export default function CourierPage() {
               </tr>
             </tbody>
           </table>
+
+          {!locationAccessDenied && (
+            <div className="mt-6">
+              <button
+                onClick={toggleStatus}
+                className={`px-4 py-2 rounded text-white ${
+                  courierData.status === "active"
+                    ? "bg-red-600 hover:bg-red-700"
+                    : "bg-green-600 hover:bg-green-700"
+                }`}
+              >
+                Set Status to {courierData.status === "active" ? "Inactive" : "Active"}
+              </button>
+            </div>
+          )}
 
           <hr className="my-8 border-t-2 border-gray-300" />
 
