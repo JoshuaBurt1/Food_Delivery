@@ -8,8 +8,8 @@ export default function UserPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [restaurants, setRestaurants] = useState([]);
-  const [restaurantData, setRestaurantData] = useState(null);
-  const [fetchingRestaurant, setFetchingRestaurant] = useState(true);
+  const [userData, setUserData] = useState(null);
+  const [fetchingUser, setFetchingUser] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
@@ -23,11 +23,11 @@ export default function UserPage() {
   useEffect(() => {
     if (!user) return;
 
-    const restaurantsRef = collection(db, "users");
+    const usersRef = collection(db, "users");
 
-    const fetchOrCreateRestaurant = async () => {
+    const fetchOrCreateUser = async () => {
       try {
-        const snapshot = await getDocs(restaurantsRef);
+        const snapshot = await getDocs(usersRef);
 
         const matchedDoc = snapshot.docs.find((doc) => {
           const data = doc.data();
@@ -38,31 +38,31 @@ export default function UserPage() {
         });
 
         if (matchedDoc) {
-          setRestaurantData({ id: matchedDoc.id, ...matchedDoc.data() });
-          setFetchingRestaurant(false);
+          setUserData({ id: matchedDoc.id, ...matchedDoc.data() });
+          setFetchingUser(false);
           return;
         }
 
-        const newRestaurant = {
+        const newUser = {
           email: user.email,
-          name: user.displayName || "Unnamed Restaurant",
+          name: user.displayName || "Unnamed User",
           createdAt: new Date(),
           status: "pending-setup",
         };
 
-        const docRef = await addDoc(restaurantsRef, newRestaurant);
-        await updateDoc(docRef, { restaurantId: docRef.id });
+        const docRef = await addDoc(usersRef, newUser);
+        await updateDoc(docRef, { userId: docRef.id });
 
-        setRestaurantData({ id: docRef.id, restaurantId: docRef.id, ...newRestaurant });
-        setFetchingRestaurant(false);
+        setUserData({ id: docRef.id, userId: docRef.id, ...newUser });
+        setFetchingUser(false);
       } catch (err) {
-        console.error("Error fetching or creating restaurant:", err);
-        setError("Something went wrong while setting up your restaurant.");
-        setFetchingRestaurant(false);
+        console.error("Error fetching or creating user:", err);
+        setError("Something went wrong while setting up your user profile.");
+        setFetchingUser(false);
       }
     };
 
-    fetchOrCreateRestaurant();
+    fetchOrCreateUser();
   }, [user]);
 
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function UserPage() {
     }
   }, [user]);
 
-  if (loading || fetchingRestaurant) return <div>Loading...</div>;
+  if (loading || fetchingUser) return <div>Loading...</div>;
   if (error) return <div className="text-red-600">{error}</div>;
   if (!user) return <Navigate to="/login" />;
 
@@ -96,6 +96,9 @@ export default function UserPage() {
 
 
 /* 
+* a form to set up and update other user information
+* ensure all users have same fields
+
 User can select multiple restaurants.
 On restaurant selection, food item choice selection
 
