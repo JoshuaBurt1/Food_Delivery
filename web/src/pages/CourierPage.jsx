@@ -101,6 +101,7 @@ export default function CourierPage() {
               name: user.displayName || "Unnamed Courier",
               earnings: 0,
               location: new GeoPoint(latitude, longitude),
+              movementFlag: "inactive",
               status: "inactive",
             };
 
@@ -220,11 +221,6 @@ export default function CourierPage() {
   if (loadingAuth) return <div>Loading authentication...</div>;
   if (!user) return <Navigate to="/login" />;
 
-  const toggleStatus = () => {
-    if (!courierData?.id || locationAccessDenied) return;
-    updateCourierStatus(courierData.status === "active" ? "inactive" : "active");
-  };
-
   return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">
@@ -244,8 +240,9 @@ export default function CourierPage() {
                 <th className="p-2 border">Name</th>
                 <th className="p-2 border">Email</th>
                 <th className="p-2 border">Earnings</th>
-                <th className="p-2 border">Status</th>
                 <th className="p-2 border">Location</th>
+                <th className="p-2 border">Movement Status</th> 
+                <th className="p-2 border">GPS Status</th>
               </tr>
             </thead>
             <tbody>
@@ -254,30 +251,15 @@ export default function CourierPage() {
                 <td className="p-2 border">{courierData.name}</td>
                 <td className="p-2 border">{courierData.email}</td>
                 <td className="p-2 border">${courierData.earnings.toFixed(2)}</td>
-                <td className="p-2 border">{courierData.status}</td>
                 <td className="p-2 border">
                   {courierData.location?.latitude.toFixed(8)},{" "}
                   {courierData.location?.longitude.toFixed(8)}
                 </td>
+                <td className="p-2 border">{courierData.movementFlag}</td>
+                <td className="p-2 border">{courierData.status}</td>
               </tr>
             </tbody>
           </table>
-
-          {!locationAccessDenied && (
-            <div className="mt-6">
-              <button
-                onClick={toggleStatus}
-                className={`px-4 py-2 rounded text-white ${
-                  courierData.status === "active"
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-green-600 hover:bg-green-700"
-                }`}
-              >
-                Set Status to {courierData.status === "active" ? "Inactive" : "Active"}
-              </button>
-            </div>
-          )}
-
           <hr className="my-8 border-t-2 border-gray-300" />
 
           <h2 className="text-xl font-semibold mb-4">📝 Task List</h2>
@@ -290,3 +272,33 @@ export default function CourierPage() {
     </div>
   );
 }
+
+/*
+TODO
+* inactivityTimer: initially set to 0; increases if gps value does not change by a significant amount
+* movementFlag: initially set to inactive; set to inactive if inactivityTimer > threshold (10min)
+* Job disclosure form on first login: gps tracking; obligation to send admin the user's status is waiting; add phoneNumber field
+
+* if the courier is within a distance of the task, it will appear in the task list
+* to start a task the courier must press an accept task button
+* admin is a bot, and will assign a task to another courier if the current courier does not respond
+* advanced: couriers with multiple tasks are possible [2 people in same area, around same time, order from the same McDonalds]; task gen function in systemFiles restaurant orders
+
+courierId: used by admin to identify the courier on a job task                                                    (essential for job)
+currentTask: used by admin to identify if the courier has a task                                                    [filled / empty]
+earnings: 
+email: necessary for admin to contact you
+inactivityTimer: difference between location coordinates within a period of time
+location: gps used on map
+movementFlag: active (moving), inactive (10 min), waiting for restaurant, waiting for customer, need assistance     [active / T]
+name: necessary for admin to contact you
+phoneNum: necessary for admin to contact you
+status: used by admin to identify if the courier has a gps connection                                               [active / T]
+
+Cases: 
+if status = inactive &                           currentTask = empty  -> currentTasks are unavailable to be added
+if status = inactive &                           currentTask = filled -> admin will contact (by email and phone number)
+if status = active   & movementFlag = inactive & currentTask = filled -> admin will contact (by email and phone number)
+
+
+*/
