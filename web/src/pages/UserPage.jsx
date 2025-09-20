@@ -1,21 +1,69 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged } from "firebase/auth";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, addDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { Navigate } from "react-router-dom";
 
 export default function UserPage() {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);  // new loading state
+  const [loading, setLoading] = useState(true);
   const [restaurants, setRestaurants] = useState([]);
+  const [restaurantData, setRestaurantData] = useState(null);
+  const [fetchingRestaurant, setFetchingRestaurant] = useState(true);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (u) => {
       setUser(u);
-      setLoading(false);  // done loading once auth state known
+      setLoading(false);
     });
     return () => unsub();
   }, []);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const restaurantsRef = collection(db, "users");
+
+    const fetchOrCreateRestaurant = async () => {
+      try {
+        const snapshot = await getDocs(restaurantsRef);
+
+        const matchedDoc = snapshot.docs.find((doc) => {
+          const data = doc.data();
+          const emailMatch = data.email === user.email;
+          const nameMatch =
+            data.name?.toLowerCase().trim() === user.displayName?.toLowerCase().trim();
+          return emailMatch || nameMatch;
+        });
+
+        if (matchedDoc) {
+          setRestaurantData({ id: matchedDoc.id, ...matchedDoc.data() });
+          setFetchingRestaurant(false);
+          return;
+        }
+
+        const newRestaurant = {
+          email: user.email,
+          name: user.displayName || "Unnamed Restaurant",
+          createdAt: new Date(),
+          status: "pending-setup",
+        };
+
+        const docRef = await addDoc(restaurantsRef, newRestaurant);
+        await updateDoc(docRef, { restaurantId: docRef.id });
+
+        setRestaurantData({ id: docRef.id, restaurantId: docRef.id, ...newRestaurant });
+        setFetchingRestaurant(false);
+      } catch (err) {
+        console.error("Error fetching or creating restaurant:", err);
+        setError("Something went wrong while setting up your restaurant.");
+        setFetchingRestaurant(false);
+      }
+    };
+
+    fetchOrCreateRestaurant();
+  }, [user]);
 
   useEffect(() => {
     if (user) {
@@ -26,10 +74,8 @@ export default function UserPage() {
     }
   }, [user]);
 
-  if (loading) {
-    return <div>Loading...</div>;  // show loading UI until auth is known
-  }
-
+  if (loading || fetchingRestaurant) return <div>Loading...</div>;
+  if (error) return <div className="text-red-600">{error}</div>;
   if (!user) return <Navigate to="/login" />;
 
   return (
@@ -47,6 +93,7 @@ export default function UserPage() {
     </div>
   );
 }
+
 
 /* 
 User can select multiple restaurants.
