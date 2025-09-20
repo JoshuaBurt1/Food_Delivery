@@ -282,21 +282,23 @@ TODO
 
 * if the courier is within a distance of the task, it will appear in the task list
 * to start a task the courier must press an accept task button -> an enrouteOrder is created in systemFiles
-* courier must select deliveryStatus option area when 1. they pick up food from restaurant and 2. deliver it to the customer
+* courier must select deliveryStatus option area when 1. they pick up food from restaurant "in transit" and 2. deliver it to the customer "completed"
                                                       1. restaurantOrder deleted               2. enrouteOrder deleted & completedOrder created + earnings increase
+* deliveryStatus: food location is either: 0. "at restaurant" (initial setting), 1. "in transit", or 2. "completed";
+                updates systemFiles field delivery status -> enrouteOrders or completedOrders depending on status
 * advanced: couriers with multiple tasks are possible [2 people in same area, around same time, order from the same McDonalds]; task gen function in systemFiles restaurant orders
 
+
 courierId: used by admin to identify the courier on a job task                                                    (essential for job)
-currentTask: used by admin to identify if the courier has a task                                                    [filled / empty]
+currentTask: used by admin to identify if the courier has a task <orderId>                                          [filled / empty]
 earnings: 
 email: necessary for admin to contact you
-inactivityTimer: icreases if no significant difference between location coordinates over a period of time, 
+inactivityTimer: increases if no significant difference between location coordinates over a period of time, 
                  reset to 0 if courier presses waiting for restaurant, waiting for customer, or movement
+location: necessary for inactivity timer calculation
 movementFlag: active (moving), inactive (10 min), waiting for restaurant, waiting for customer, need assistance     [active / T]
 name: necessary for admin to contact you
 phoneNum: necessary for admin to contact you
-deliveryStatus: food location is either: 0. "at restaurant" (initial setting), 1. "in transit", or 2. "completed";
-        updates systemFiles -> enrouteOrders or completedOrders depending on status
 status: used by admin to identify if the courier has a gps connection                                               [active / T]
 
 Cases: 
