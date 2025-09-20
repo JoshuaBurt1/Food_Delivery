@@ -48,3 +48,11 @@ export default function UserPage() {
   );
 }
 
+/* 
+User can select multiple restaurants.
+On restaurant selection, food item choice selection
+
+Message system to admin team if excessive wait time
+Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
+System updates from courier (waiting for restaurant, assistance button pressed)
+*/

@@ -265,7 +265,7 @@ export default function CourierPage() {
           <h2 className="text-xl font-semibold mb-4">📝 Task List</h2>
 
           <ul className="list-disc list-inside text-gray-600">
-            <li className="italic text-gray-400">No tasks assigned yet.</li>
+            <li className="italic text-gray-400">No tasks selectable yet.</li>
           </ul>
         </>
       ) : null}
@@ -277,28 +277,34 @@ export default function CourierPage() {
 TODO
 * inactivityTimer: initially set to 0; increases if gps value does not change by a significant amount
 * movementFlag: initially set to inactive; set to inactive if inactivityTimer > threshold (10min)
-* Job disclosure form on first login: gps tracking; obligation to send admin the user's status is waiting; add phoneNumber field
+* Job disclosure form on first login: standard procedures/rules - gps tracking; click picked up food button; 
+  obligation to send admin the user's status if waiting; add phoneNumber field
 
 * if the courier is within a distance of the task, it will appear in the task list
 * to start a task the courier must press an accept task button
-* admin is a bot, and will assign a task to another courier if the current courier does not respond
+* courier must select pickup button once they pick up food from restaurant
 * advanced: couriers with multiple tasks are possible [2 people in same area, around same time, order from the same McDonalds]; task gen function in systemFiles restaurant orders
 
 courierId: used by admin to identify the courier on a job task                                                    (essential for job)
 currentTask: used by admin to identify if the courier has a task                                                    [filled / empty]
 earnings: 
 email: necessary for admin to contact you
-inactivityTimer: difference between location coordinates within a period of time
-location: gps used on map
+inactivityTimer: icreases if no significant difference between location coordinates over a period of time, 
+                 reset to 0 if courier presses waiting for restaurant, waiting for customer, or movement
 movementFlag: active (moving), inactive (10 min), waiting for restaurant, waiting for customer, need assistance     [active / T]
 name: necessary for admin to contact you
 phoneNum: necessary for admin to contact you
+pickup: food location needs to be known; it's either still at the restaurant or in the courier's vehicle
 status: used by admin to identify if the courier has a gps connection                                               [active / T]
 
 Cases: 
-if status = inactive &                           currentTask = empty  -> currentTasks are unavailable to be added
-if status = inactive &                           currentTask = filled -> admin will contact (by email and phone number)
-if status = active   & movementFlag = inactive & currentTask = filled -> admin will contact (by email and phone number)
+1. status = inactive &                                  currentTask = empty  -> currentTasks are unavailable to be added
+2. status = inactive &                                  currentTask = filled -> admin will contact (by email and phone number)
+3. status = active   & movementFlag = inactive        & currentTask = filled -> admin will contact (by email and phone number)
+4. status = active   & movementFlag = need assistance & currentTask = filled -> admin will contact (by email and phone number)
 
+* admin (bot) will reassign the task to restaurant orders, if the current courier (2) has it, and does not respond after msg 
+* admin (bot) will reassign the task to restaurant orders, if the current courier (3) has it, and does not respond after msg 
+* admin (bot) will create a special assistance task to restaurant orders, if the courier (4) asks for assistance
 
 */

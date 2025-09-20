@@ -27,3 +27,9 @@ export default function RestaurantPage() {
     </div>
   );
 }
+
+/*
+* Restaurant manager logs in and updates menu.
+* Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
+* Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
+*/
