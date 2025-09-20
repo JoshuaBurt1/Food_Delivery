@@ -277,12 +277,13 @@ export default function CourierPage() {
 TODO
 * inactivityTimer: initially set to 0; increases if gps value does not change by a significant amount
 * movementFlag: initially set to inactive; set to inactive if inactivityTimer > threshold (10min)
-* Job disclosure form on first login: standard procedures/rules - gps tracking; click picked up food button; 
-  obligation to send admin the user's status if waiting; add phoneNumber field
+* Job disclosure form on first login: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
+  obligation to select movementFlag updates if waiting; add phoneNumber field
 
 * if the courier is within a distance of the task, it will appear in the task list
-* to start a task the courier must press an accept task button
-* courier must select pickup button once they pick up food from restaurant
+* to start a task the courier must press an accept task button -> an enrouteOrder is created in systemFiles
+* courier must select deliveryStatus option area when 1. they pick up food from restaurant and 2. deliver it to the customer
+                                                      1. restaurantOrder deleted               2. enrouteOrder deleted & completedOrder created + earnings increase
 * advanced: couriers with multiple tasks are possible [2 people in same area, around same time, order from the same McDonalds]; task gen function in systemFiles restaurant orders
 
 courierId: used by admin to identify the courier on a job task                                                    (essential for job)
@@ -294,7 +295,8 @@ inactivityTimer: icreases if no significant difference between location coordina
 movementFlag: active (moving), inactive (10 min), waiting for restaurant, waiting for customer, need assistance     [active / T]
 name: necessary for admin to contact you
 phoneNum: necessary for admin to contact you
-pickup: food location needs to be known; it's either still at the restaurant or in the courier's vehicle
+deliveryStatus: food location is either: 0. "at restaurant" (initial setting), 1. "in transit", or 2. "completed";
+        updates systemFiles -> enrouteOrders or completedOrders depending on status
 status: used by admin to identify if the courier has a gps connection                                               [active / T]
 
 Cases: 
@@ -306,5 +308,4 @@ Cases:
 * admin (bot) will reassign the task to restaurant orders, if the current courier (2) has it, and does not respond after msg 
 * admin (bot) will reassign the task to restaurant orders, if the current courier (3) has it, and does not respond after msg 
 * admin (bot) will create a special assistance task to restaurant orders, if the courier (4) asks for assistance
-
 */
