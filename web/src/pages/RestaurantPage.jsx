@@ -102,5 +102,6 @@ Advanced: the reason orders are in systemFiles and not restaurant:
 3. completedOrders is the only "infinite" size document, rarely accessed. Can be ordered and searched quickly by createdAt date, courierId, restaurantId, userId.
 # these could be broken up further to reduce size (one restaurantOrders/enrouteOrders/completedOrders per restuarant); collection within a document
 
+
 # validity of address is "enforced" by the restaurant manager wanting sales. Advanced: further enforced by a courier message to admin if unable to access site.
 */

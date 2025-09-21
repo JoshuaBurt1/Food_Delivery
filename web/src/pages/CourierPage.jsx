@@ -280,7 +280,7 @@ TODO
 * Job disclosure form on first login: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
   obligation to select movementFlag updates if waiting; add phoneNumber field
 
-* if the courier is within a distance of the task, it will appear in the task list
+* courier must be within a certain distance to accept a task
 * to start a task the courier must press an accept task button -> an enrouteOrder is created in systemFiles
 * courier must select deliveryStatus option area when 1. they pick up food from restaurant "in transit" and 2. deliver it to the customer "completed"
                                                       1. restaurantOrder deleted               2. enrouteOrder deleted & completedOrder created + earnings increase

@@ -37,15 +37,65 @@ const restaurantIcon = new L.Icon({
 
 function FitBoundsView({ markers }) {
   const map = useMap();
+  const [hasFit, setHasFit] = useState(false);
 
   useEffect(() => {
-    if (!markers.length) return;
+    if (!markers.length || hasFit) return;
 
     const bounds = L.latLngBounds(markers);
     map.fitBounds(bounds, { padding: [50, 50] });
-  }, [map, markers]);
+    setHasFit(true);
+  }, [map, markers, hasFit]);
 
   return null;
+}
+
+function ZoomToRadius({ setSearchRadius, setMapInstance }) {
+  const map = useMap();
+
+  useEffect(() => {
+    setMapInstance(map); // so we can access it outside too
+
+    function handleZoom() {
+      const zoom = map.getZoom();
+
+      // Approximate radius formula based on zoom level
+      const radius = zoomLevelToKm(zoom);
+      setSearchRadius(radius);
+    }
+
+    map.on("zoomend", handleZoom);
+    handleZoom(); // Run once on mount
+
+    return () => {
+      map.off("zoomend", handleZoom);
+    };
+  }, [map, setSearchRadius, setMapInstance]);
+
+  return null;
+}
+
+function zoomLevelToKm(zoom) {
+  // Approximate mapping from Leaflet zoom level to radius in km
+  const zoomToKm = {
+    5: 1000,
+    6: 500,
+    7: 300,
+    8: 200,
+    9: 100,
+    10: 50,
+    11: 15,
+    12: 10,
+    13: 5,
+    14: 2.5,
+    15: 1.5,
+    16: 1,
+    17: 0.5,
+    18: 0.25,
+  };
+
+  const radius = zoomToKm[zoom] || 500;
+  return Math.min(radius, 500); // Clamp max radius to 500km
 }
 
 // ADDRESS to GEOLOCATION: OpenCage API
@@ -96,6 +146,8 @@ export default function UserPage() {
   const [addressInput, setAddressInput] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [expandedRestaurantId, setExpandedRestaurantId] = useState(null);
+  const [mapInstance, setMapInstance] = useState(null);
+  const [searchRadius, setSearchRadius] = useState(25); // default
 
   // Auth listener
   useEffect(() => {
@@ -137,7 +189,7 @@ export default function UserPage() {
           email: user.email,
           name: user.displayName || "Unnamed User",
           createdAt: new Date(),
-          deliveryLocation: new GeoPoint(90, 90),
+          deliveryLocation: new GeoPoint(90, 0),
           address: "",
         };
 
@@ -224,7 +276,7 @@ export default function UserPage() {
       ? [userData.deliveryLocation.latitude, userData.deliveryLocation.longitude]
       : [51.505, -0.09]; // London as fallback
 
-  const restaurantsWithin50km = restaurants
+  const restaurantsWithinRange = restaurants
   .map((r) => {
     const rLat = r.location?.latitude;
     const rLng = r.location?.longitude;
@@ -234,7 +286,16 @@ export default function UserPage() {
     const distance = getDistanceInKm(userLatLng[0], userLatLng[1], rLat, rLng);
     return { ...r, distance: parseFloat(distance) };
   })
-  .filter((r) => r && r.distance <= 50);
+  .filter((r) => r && r.distance <= searchRadius);
+
+  const groupedByType = restaurantsWithinRange.reduce((acc, r) => {
+    const type = r.type || "Other";
+    if (!acc[type]) acc[type] = [];
+    acc[type].push(r);
+    return acc;
+  }, {});
+
+  const sortedTypes = Object.keys(groupedByType).sort();
 
   return (
     <div className="p-6">
@@ -291,14 +352,18 @@ export default function UserPage() {
       <div className="h-[500px] w-full rounded overflow-hidden border border-gray-300 mt-4">
         <MapContainer
           center={userLatLng}
-          zoom={13}
-          scrollWheelZoom={false}
+          zoom={9}
+          scrollWheelZoom={true}
           style={{ height: "300px", width: "300px" }}
         >
+          <ZoomToRadius
+            setSearchRadius={setSearchRadius}
+            setMapInstance={setMapInstance}
+          />
           <FitBoundsView
             markers={[
               userLatLng,
-              ...restaurantsWithin50km.map((r) => [
+              ...restaurantsWithinRange.map((r) => [
                 r.location.latitude,
                 r.location.longitude,
               ]),
@@ -312,11 +377,11 @@ export default function UserPage() {
             <Popup>Your delivery location</Popup>
           </Marker>
 
-          {restaurantsWithin50km.map((r) => (
+          {restaurantsWithinRange.map((r) => (
             <Marker
               key={r.id}
               position={[r.location.latitude, r.location.longitude]}
-              icon={restaurantIcon} // 👈 apply the custom icon here
+              icon={restaurantIcon}
             >
               <Popup>
                 <strong>{r.name}</strong>
@@ -329,105 +394,79 @@ export default function UserPage() {
           ))}
         </MapContainer>
       </div>
-
-
-     <h2 className="mt-8 text-xl">Nearby Restaurants</h2>
+      <h2 className="mt-8 text-xl">Nearby Restaurants</h2>
       <div className="mt-4 space-y-6">
-        {(() => {
-          const rLatLng = userLatLng;
-          const grouped = {};
+        {sortedTypes.map((type) => (
+          <div key={type}>
+            <h3 className="text-lg font-semibold mb-2">{type}</h3>
+            <ul className="space-y-2">
+              {groupedByType[type].map((r) => {
+                const rLat = r.location?.latitude;
+                const rLng = r.location?.longitude;
+                const distance = (rLat && rLng)
+                  ? getDistanceInKm(userLatLng[0], userLatLng[1], rLat, rLng)
+                  : null;
+                const isExpanded = expandedRestaurantId === r.id;
 
-          // Group restaurants by type
-          restaurantsWithin50km.forEach((r) => {
-            const type = r.type || "Other";
-            if (!grouped[type]) grouped[type] = [];
-            grouped[type].push(r);
-          });
+                return (
+                  <li
+                    key={r.id}
+                    className="border p-2 rounded shadow cursor-pointer"
+                    onClick={() => setExpandedRestaurantId(isExpanded ? null : r.id)}
+                  >
+                    <h4 className="font-semibold">
+                      {r.name}
+                      {distance ? (
+                        <span className="text-sm text-gray-600">
+                          {" "}— {distance} km away
+                        </span>
+                      ) : (
+                        <span className="text-sm text-red-600">
+                          {" "}— Location missing
+                        </span>
+                      )}
+                    </h4>
+                    <p className="text-sm text-gray-700">{r.address}</p>
 
-          // Sort types alphabetically
-          const sortedTypes = Object.keys(grouped).sort();
-
-          return sortedTypes.map((type) => (
-            <div key={type}>
-              <h3 className="text-lg font-semibold mb-2">{type}</h3>
-              <ul className="space-y-2">
-                {grouped[type].map((r) => {
-                  const rLat = r.location?.latitude;
-                  const rLng = r.location?.longitude;
-
-                  const distance =
-                    rLat && rLng
-                      ? getDistanceInKm(rLatLng[0], rLatLng[1], rLat, rLng)
-                      : null;
-
-                  const isExpanded = expandedRestaurantId === r.id;
-
-                  return (
-                    <li
-                      key={r.id}
-                      className="border p-2 rounded shadow cursor-pointer"
-                      onClick={() =>
-                        setExpandedRestaurantId(isExpanded ? null : r.id)
-                      }
-                    >
-                      <h4 className="font-semibold">
-                        {r.name}
-                        {distance ? (
-                          <span className="text-sm text-gray-600">
-                            {" "}— {distance} km away
-                          </span>
-                        ) : (
-                          <span className="text-sm text-red-600">
-                            {" "}— Location missing
-                          </span>
-                        )}
-                      </h4>
-                      <p className="text-sm text-gray-700">{r.address}</p>
-
-                      {/* Menu appears when restaurant is expanded */}
-                      {isExpanded && r.menu && r.menu.length > 0 && (
-                        <ul className="mt-4 space-y-4">
-                          {r.menu.map((item, index) => (
-                            <li
-                              key={index}
-                              className="border rounded p-3 shadow-sm flex flex-col sm:flex-row sm:items-start gap-4"
-                            >
+                    {/* Only show available menu items */}
+                    {isExpanded && r.menu && r.menu.filter(item => item.available).length > 0 && (
+                      <ul className="mt-4 space-y-4">
+                        {r.menu.filter(item => item.available).map((item, index) => (
+                          <li
+                            key={index}
+                            className="border rounded p-3 shadow-sm flex flex-col sm:flex-row sm:items-start gap-4"
+                          >
                             <div className="flex items-start space-x-4">
-                            {item.imgUrl && (
-                              <img
-                                src={item.imgUrl}
-                                alt={item.name}
-                                style={{ width: "100px", height: "100px", objectFit: "cover" }}
-                                className="rounded shrink-0"
-                              />
-                            )}
-                            <div>
-                              <h5 className="font-semibold">{item.name}</h5>
-                              <p className="text-sm text-gray-600">{item.description}</p>
-                              <p className="text-sm text-gray-500">Calories: {item.calories}</p>
-                              <p className="text-sm font-medium">${item.price?.toFixed(2)}</p>
+                              {item.imgUrl && (
+                                <img
+                                  src={item.imgUrl}
+                                  alt={item.name}
+                                  style={{ width: "100px", height: "100px", objectFit: "cover" }}
+                                  className="rounded shrink-0"
+                                />
+                              )}
+                              <div>
+                                <h5 className="font-semibold">{item.name}</h5>
+                                <p className="text-sm text-gray-600">{item.description}</p>
+                                <p className="text-sm text-gray-500">Calories: {item.calories}</p>
+                                <p className="text-sm font-medium">${item.price?.toFixed(2)}</p>
+                              </div>
                             </div>
-                          </div>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
 
-                      {/* If no menu exists */}
-                      {isExpanded && (!r.menu || r.menu.length === 0) && (
-                        <p className="mt-2 text-sm italic text-gray-500">
-                          No menu available.
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ));
-        })()}
+                    {isExpanded && (!r.menu || r.menu.filter(item => item.available).length === 0) && (
+                      <p className="mt-2 text-sm italic text-gray-500">No menu available.</p>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </div>
-
     </div>
   );
 }
@@ -435,7 +474,6 @@ export default function UserPage() {
 
 
 /* 
-* Selectable range options (10km, 25km, 50km)
 * only show restaurants that are open (make a night restaurant in database to test)
 * replace tailwind with regular css or get tailwind working
 * On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
@@ -448,6 +486,7 @@ Maybe: Since anyone can create a restaurant, many can appear on the map. Prefere
 Maybe: Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
 Maybe: System updates from courier (waiting for restaurant, assistance button pressed)
 
+Advanced: decrease database read and writes by setting static restaurant range
 Advanced: Message system to admin team if excessive wait time
 Advanced: order from multiple restaurants in one order.
 
