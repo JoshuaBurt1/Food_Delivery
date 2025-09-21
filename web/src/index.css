@@ -171,3 +171,127 @@ button:focus-visible {
     margin-right: 10px;
     color: #333;
 }
+
+/*UserPage.jsx*/
+.container {
+  padding: 24px;
+}
+
+.heading {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 16px;
+  border: 1px solid #ccc;
+}
+
+.table th,
+.table td {
+  text-align: left;
+  padding: 12px;
+  border-bottom: 1px solid #ccc;
+}
+
+.table th {
+  background-color: #f7f7f7;
+}
+
+.input-field {
+  width: 100%;
+  max-width: 60ch;
+  padding: 8px 16px;
+  border: 1px solid #ccc;
+  font-size: 16px;
+  border-radius: 4px;
+}
+
+.button {
+  padding: 8px 16px;
+  background-color: #2563eb;
+  color: white;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+  width: 100%;
+}
+
+.button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.map-container {
+  height: 300px;
+  width: 300px;
+  border: 1px solid #ccc;
+  margin-top: 16px;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.restaurant-section {
+  margin-top: 32px;
+}
+
+.restaurant-type {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.restaurant-item {
+  border: 1px solid #ccc;
+  padding: 12px;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+}
+
+.restaurant-name {
+  font-weight: 600;
+}
+
+.restaurant-address {
+  font-size: 14px;
+  color: #555;
+}
+
+.restaurant-distance {
+  font-size: 14px;
+  color: #666;
+}
+
+.menu-list {
+  margin-top: 16px;
+}
+
+.menu-item {
+  border: 1px solid #ccc;
+  padding: 12px;
+  border-radius: 4px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.05);
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.menu-item img {
+  width: 100px;
+  height: 100px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.menu-item h5 {
+  margin: 0;
+  font-weight: 600;
+}
+
+.menu-item p {
+  margin: 4px 0;
+  font-size: 14px;
+}

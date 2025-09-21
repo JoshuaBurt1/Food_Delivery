@@ -95,6 +95,7 @@ export default function UserPage() {
   const [error, setError] = useState(null);
   const [addressInput, setAddressInput] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
+  const [expandedRestaurantId, setExpandedRestaurantId] = useState(null);
 
   // Auth listener
   useEffect(() => {
@@ -359,23 +360,65 @@ export default function UserPage() {
                       ? getDistanceInKm(rLatLng[0], rLatLng[1], rLat, rLng)
                       : null;
 
+                  const isExpanded = expandedRestaurantId === r.id;
+
                   return (
-                    <li key={r.id} className="border p-2 rounded shadow">
+                    <li
+                      key={r.id}
+                      className="border p-2 rounded shadow cursor-pointer"
+                      onClick={() =>
+                        setExpandedRestaurantId(isExpanded ? null : r.id)
+                      }
+                    >
                       <h4 className="font-semibold">
                         {r.name}
                         {distance ? (
                           <span className="text-sm text-gray-600">
-                            {" "}
-                            — {distance} km away
+                            {" "}— {distance} km away
                           </span>
                         ) : (
                           <span className="text-sm text-red-600">
-                            {" "}
-                            — Location missing
+                            {" "}— Location missing
                           </span>
                         )}
                       </h4>
                       <p className="text-sm text-gray-700">{r.address}</p>
+
+                      {/* Menu appears when restaurant is expanded */}
+                      {isExpanded && r.menu && r.menu.length > 0 && (
+                        <ul className="mt-4 space-y-4">
+                          {r.menu.map((item, index) => (
+                            <li
+                              key={index}
+                              className="border rounded p-3 shadow-sm flex flex-col sm:flex-row sm:items-start gap-4"
+                            >
+                            <div className="flex items-start space-x-4">
+                            {item.imgUrl && (
+                              <img
+                                src={item.imgUrl}
+                                alt={item.name}
+                                style={{ width: "100px", height: "100px", objectFit: "cover" }}
+                                className="rounded shrink-0"
+                              />
+                            )}
+                            <div>
+                              <h5 className="font-semibold">{item.name}</h5>
+                              <p className="text-sm text-gray-600">{item.description}</p>
+                              <p className="text-sm text-gray-500">Calories: {item.calories}</p>
+                              <p className="text-sm font-medium">${item.price?.toFixed(2)}</p>
+                            </div>
+                          </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+
+                      {/* If no menu exists */}
+                      {isExpanded && (!r.menu || r.menu.length === 0) && (
+                        <p className="mt-2 text-sm italic text-gray-500">
+                          No menu available.
+                        </p>
+                      )}
                     </li>
                   );
                 })}
@@ -392,6 +435,7 @@ export default function UserPage() {
 
 
 /* 
+* replace tailwind with regular css
 * On user restaurant selection (right side lists options) -> food item choice selection -> pay + order
 Add a precise location pointer on clicking the map
 Special restaurant instructions (allergy)

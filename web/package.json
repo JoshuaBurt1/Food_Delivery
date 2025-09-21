@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "tailwind:init": "./node_modules/.bin/tailwindcss init -p"
   },
   "dependencies": {
     "firebase": "^12.2.1",
