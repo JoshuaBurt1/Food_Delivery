@@ -25,11 +25,25 @@ L.Icon.Default.mergeOptions({
     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
 });
 
-function ChangeMapView({ center }) {
+const restaurantIcon = new L.Icon({
+  iconUrl: "https://cdn-icons-png.flaticon.com/512/1046/1046784.png",
+  iconSize: [32, 32],
+  iconAnchor: [16, 32], // half width, full height
+  popupAnchor: [0, -32], // position popup above icon
+  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+  shadowSize: [41, 41],
+  shadowAnchor: [13, 41],
+});
+
+function FitBoundsView({ markers }) {
   const map = useMap();
+
   useEffect(() => {
-    map.setView(center, map.getZoom(), { animate: true });
-  }, [center, map]);
+    if (!markers.length) return;
+
+    const bounds = L.latLngBounds(markers);
+    map.fitBounds(bounds, { padding: [50, 50] });
+  }, [map, markers]);
 
   return null;
 }
@@ -208,7 +222,18 @@ export default function UserPage() {
     userData?.deliveryLocation
       ? [userData.deliveryLocation.latitude, userData.deliveryLocation.longitude]
       : [51.505, -0.09]; // London as fallback
-  console.log("userLatLng coords:", userLatLng);
+
+  const restaurantsWithin50km = restaurants
+  .map((r) => {
+    const rLat = r.location?.latitude;
+    const rLng = r.location?.longitude;
+
+    if (!rLat || !rLng) return null;
+
+    const distance = getDistanceInKm(userLatLng[0], userLatLng[1], rLat, rLng);
+    return { ...r, distance: parseFloat(distance) };
+  })
+  .filter((r) => r && r.distance <= 50);
 
   return (
     <div className="p-6">
@@ -269,7 +294,15 @@ export default function UserPage() {
           scrollWheelZoom={false}
           style={{ height: "300px", width: "300px" }}
         >
-          <ChangeMapView center={userLatLng} />
+          <FitBoundsView
+            markers={[
+              userLatLng,
+              ...restaurantsWithin50km.map((r) => [
+                r.location.latitude,
+                r.location.longitude,
+              ]),
+            ]}
+          />
           <TileLayer
             attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -277,8 +310,25 @@ export default function UserPage() {
           <Marker position={userLatLng}>
             <Popup>Your delivery location</Popup>
           </Marker>
+
+          {restaurantsWithin50km.map((r) => (
+            <Marker
+              key={r.id}
+              position={[r.location.latitude, r.location.longitude]}
+              icon={restaurantIcon} // 👈 apply the custom icon here
+            >
+              <Popup>
+                <strong>{r.name}</strong>
+                <br />
+                {r.address}
+                <br />
+                {r.distance.toFixed(2)} km away
+              </Popup>
+            </Marker>
+          ))}
         </MapContainer>
       </div>
+
 
      <h2 className="mt-8 text-xl">Nearby Restaurants</h2>
       <div className="mt-4 space-y-6">
@@ -287,7 +337,7 @@ export default function UserPage() {
           const grouped = {};
 
           // Group restaurants by type
-          restaurants.forEach((r) => {
+          restaurantsWithin50km.forEach((r) => {
             const type = r.type || "Other";
             if (!grouped[type]) grouped[type] = [];
             grouped[type].push(r);
@@ -342,10 +392,11 @@ export default function UserPage() {
 
 
 /* 
-User can select multiple restaurants. Show the restaurant locations on the map with markers.
-On restaurant selection, food item choice selection
+Show the restaurant locations on the map with markers. Allow user to move location pointer.
+On user restaurant selection -> food item choice selection
 
 Message system to admin team if excessive wait time
 Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
 System updates from courier (waiting for restaurant, assistance button pressed)
+Advanced: order from multiple restaurants in one order.
 */
