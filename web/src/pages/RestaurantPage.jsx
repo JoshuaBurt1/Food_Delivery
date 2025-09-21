@@ -89,10 +89,14 @@ export default function RestaurantPage() {
 
 
 /*
-* a form to set up and update restaurant manager information
-* ensure all restaurant managers have same fields
+*** a form to set up and update restaurant manager information (ensure all restaurant managers have same fields)
+*** Restaurant manager logs in and updates menu.
 
-* Restaurant manager logs in and updates menu.
-* Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
-* Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
+* Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
+* Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
+
+Advanced: Restaurant has to accept the order for it to be processed -> refund user if not accepted
+
+
+# validity of address is "enforced" by the restaurant manager wanting sales; advanced: further enforced by a courier message to admin if unable to access area
 */

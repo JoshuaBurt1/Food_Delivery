@@ -310,4 +310,7 @@ Cases:
 * admin (bot) will reassign the task to restaurant orders, if the current courier (2) has it, and does not respond after msg 
 * admin (bot) will reassign the task to restaurant orders, if the current courier (3) has it, and does not respond after msg 
 * admin (bot) will create a special assistance task to restaurant orders, if the courier (4) asks for assistance
+
+
+# Assumes GPS is always dynamic, gps and movement is always tracked
 */

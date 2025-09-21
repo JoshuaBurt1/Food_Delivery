@@ -435,16 +435,20 @@ export default function UserPage() {
 
 
 /* 
-* replace tailwind with regular css
-* On user restaurant selection (right side lists options) -> food item choice selection -> pay + order
+* replace tailwind with regular css or get tailwind working
+* On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
 Add a precise location pointer on clicking the map
 Special restaurant instructions (allergy)
 Special courier instructions (gated entry password...)
 Show courier moving on map (car icon)
 
+Maybe: Since anyone can create a restaurant, many can appear on the map. Preferential appearance based on totalOrders from unique userId. (Paid preferential appearance option like Google Search)
 Maybe: Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
 Maybe: System updates from courier (waiting for restaurant, assistance button pressed)
 
 Advanced: Message system to admin team if excessive wait time
 Advanced: order from multiple restaurants in one order.
+
+
+# Assumes GPS is generally static, user can modify in input section
 */
