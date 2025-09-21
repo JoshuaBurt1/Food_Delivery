@@ -89,7 +89,7 @@ export default function RestaurantPage() {
 
 
 /*
-* a form to set up and update other restaurant manager information
+* a form to set up and update restaurant manager information
 * ensure all restaurant managers have same fields
 
 * Restaurant manager logs in and updates menu.

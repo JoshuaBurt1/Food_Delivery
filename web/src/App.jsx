@@ -12,6 +12,7 @@ import Login from "./pages/Login";
 import UserPage from "./pages/UserPage";
 import RestaurantPage from "./pages/RestaurantPage";
 import CourierPage from "./pages/CourierPage";
+import 'leaflet/dist/leaflet.css';
 
 function App() {
   const [role, setRole] = useState(() => localStorage.getItem("selectedRole") || null);
