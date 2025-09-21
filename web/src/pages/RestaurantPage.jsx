@@ -92,11 +92,15 @@ export default function RestaurantPage() {
 *** a form to set up and update restaurant manager information (ensure all restaurant managers have same fields)
 *** Restaurant manager logs in and updates menu.
 
-* Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
-* Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
+Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
+Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
 
 Advanced: Restaurant has to accept the order for it to be processed -> refund user if not accepted
+Advanced: the reason orders are in systemFiles and not restaurant:
+1. the number of restaurantOrders, enrouteOrders, completedOrders could get very large -> large document
+2. restaurantOrders & enrouteOrders array are constantly added to / deleted keeping it a managable size
+3. completedOrders is the only "infinite" size document, rarely accessed. Can be ordered and searched quickly by createdAt date, courierId, restaurantId, userId.
+# these could be broken up further to reduce size (one restaurantOrders/enrouteOrders/completedOrders per restuarant); collection within a document
 
-
-# validity of address is "enforced" by the restaurant manager wanting sales; advanced: further enforced by a courier message to admin if unable to access area
+# validity of address is "enforced" by the restaurant manager wanting sales. Advanced: further enforced by a courier message to admin if unable to access site.
 */

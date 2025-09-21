@@ -435,14 +435,16 @@ export default function UserPage() {
 
 
 /* 
+* Selectable range options (10km, 25km, 50km)
+* only show restaurants that are open (make a night restaurant in database to test)
 * replace tailwind with regular css or get tailwind working
 * On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
-Add a precise location pointer on clicking the map
-Special restaurant instructions (allergy)
-Special courier instructions (gated entry password...)
-Show courier moving on map (car icon)
+Later: Add a precise location pointer on clicking the map
+Later: Special restaurant instructions (allergy)
+Later: Special courier instructions (gated entry password...)
+Later: Show courier moving on map (car icon)
 
-Maybe: Since anyone can create a restaurant, many can appear on the map. Preferential appearance based on totalOrders from unique userId. (Paid preferential appearance option like Google Search)
+Maybe: Since anyone can create a restaurant, many can appear on the map. Preferential appearance based on totalOrders from unique userId. Advanced (restaurant): Paid preferential appearance option like Google Search.
 Maybe: Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
 Maybe: System updates from courier (waiting for restaurant, assistance button pressed)
 
