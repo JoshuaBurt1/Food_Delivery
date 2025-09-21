@@ -57,6 +57,21 @@ async function geocodeAddress(address) {
   }
 }
 
+// DISTANCE CALCULATION (User to restaurant)
+function getDistanceInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return (R * c).toFixed(2); // distance in km, rounded to 2 decimals
+}
+
 export default function UserPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -265,15 +280,61 @@ export default function UserPage() {
         </MapContainer>
       </div>
 
-      <h2 className="mt-8 text-xl">Nearby Restaurants</h2>
-      <ul className="mt-2 space-y-2">
-        {restaurants.map((r) => (
-          <li key={r.id} className="border p-2 rounded shadow">
-            <h3 className="font-semibold">{r.name}</h3>
-            <p>{r.description}</p>
-          </li>
-        ))}
-      </ul>
+     <h2 className="mt-8 text-xl">Nearby Restaurants</h2>
+      <div className="mt-4 space-y-6">
+        {(() => {
+          const rLatLng = userLatLng;
+          const grouped = {};
+
+          // Group restaurants by type
+          restaurants.forEach((r) => {
+            const type = r.type || "Other";
+            if (!grouped[type]) grouped[type] = [];
+            grouped[type].push(r);
+          });
+
+          // Sort types alphabetically
+          const sortedTypes = Object.keys(grouped).sort();
+
+          return sortedTypes.map((type) => (
+            <div key={type}>
+              <h3 className="text-lg font-semibold mb-2">{type}</h3>
+              <ul className="space-y-2">
+                {grouped[type].map((r) => {
+                  const rLat = r.location?.latitude;
+                  const rLng = r.location?.longitude;
+
+                  const distance =
+                    rLat && rLng
+                      ? getDistanceInKm(rLatLng[0], rLatLng[1], rLat, rLng)
+                      : null;
+
+                  return (
+                    <li key={r.id} className="border p-2 rounded shadow">
+                      <h4 className="font-semibold">
+                        {r.name}
+                        {distance ? (
+                          <span className="text-sm text-gray-600">
+                            {" "}
+                            — {distance} km away
+                          </span>
+                        ) : (
+                          <span className="text-sm text-red-600">
+                            {" "}
+                            — Location missing
+                          </span>
+                        )}
+                      </h4>
+                      <p className="text-sm text-gray-700">{r.address}</p>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ));
+        })()}
+      </div>
+
     </div>
   );
 }
