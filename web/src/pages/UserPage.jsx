@@ -392,11 +392,15 @@ export default function UserPage() {
 
 
 /* 
-Show the restaurant locations on the map with markers. Allow user to move location pointer.
-On user restaurant selection -> food item choice selection
+* On user restaurant selection (right side lists options) -> food item choice selection -> pay + order
+Add a precise location pointer on clicking the map
+Special restaurant instructions (allergy)
+Special courier instructions (gated entry password...)
+Show courier moving on map (car icon)
 
-Message system to admin team if excessive wait time
-Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
-System updates from courier (waiting for restaurant, assistance button pressed)
+Maybe: Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
+Maybe: System updates from courier (waiting for restaurant, assistance button pressed)
+
+Advanced: Message system to admin team if excessive wait time
 Advanced: order from multiple restaurants in one order.
 */
