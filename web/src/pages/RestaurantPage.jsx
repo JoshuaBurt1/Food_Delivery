@@ -6,9 +6,33 @@ import {
   collection,
   getDocs,
   addDoc,
+  GeoPoint,
   doc,
   updateDoc,
 } from "firebase/firestore";
+
+// ADDRESS to GEOLOCATION: OpenCage API
+async function geocodeAddress(address) {
+  const apiKey = "183a5a8cb47547249e4b3a3a44e9e24f";
+  const url = `https://api.opencagedata.com/geocode/v1/json?q=${encodeURIComponent(
+    address
+  )}&key=${apiKey}`;
+
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+
+    if (data.results.length > 0) {
+      const { lat, lng } = data.results[0].geometry;
+      return { lat, lng };
+    } else {
+      throw new Error("No results found.");
+    }
+  } catch (err) {
+    console.error("Geocoding failed:", err);
+    throw err;
+  }
+}
 
 export default function RestaurantPage() {
   const [user, setUser] = useState(null);
@@ -50,12 +74,14 @@ export default function RestaurantPage() {
         }
 
         // No match found: create a new restaurant document
-        const newRestaurant = {
-          email: user.email,
-          name: user.displayName || "Unnamed Restaurant",
-          createdAt: new Date(),
-          status: "pending-setup", // example status
-        };
+       const newRestaurant = {
+        email: user.email,
+        name: user.displayName || "Unnamed Restaurant",
+        address: "",
+        phone: "",
+        createdAt: new Date(),
+        status: "pending-setup",
+      };
 
         const docRef = await addDoc(restaurantsRef, newRestaurant);
         await updateDoc(docRef, { restaurantId: docRef.id });
@@ -81,17 +107,103 @@ export default function RestaurantPage() {
       <h1 className="text-2xl font-bold">
         Welcome, {user.displayName} (Restaurant Manager)
       </h1>
-      <p className="mt-2 text-gray-600">Restaurant ID: {restaurantData?.restaurantId}</p>
-      {/* You can add more restaurant dashboard components here */}
+
+      {/* ✅ Uneditable Info Section */}
+      <div className="mt-6 bg-gray-100 p-4 rounded-md shadow">
+        <h2 className="text-lg font-semibold mb-2">Restaurant Details (Read-Only)</h2>
+        <p><strong>Restaurant ID:</strong> {restaurantData.restaurantId}</p>
+        <p><strong>Created At:</strong> {restaurantData.createdAt?.toDate().toLocaleString()}</p>
+        <p><strong>Email:</strong> {restaurantData.email}</p>
+        <p><strong>Manager Name:</strong> {restaurantData.name}</p>
+        <p><strong>Location:</strong> Lat: {restaurantData.location?.latitude}, Lng: {restaurantData.location?.longitude}</p>
+        <p><strong>Rating:</strong> {restaurantData.rating}</p>
+        <p><strong>Total Orders:</strong> {restaurantData.totalOrders}</p>
+      </div>
+
+      {/* ✅ Editable Form */}
+      <form
+        className="mt-6 space-y-4 max-w-md"
+        onSubmit={async (e) => {
+          e.preventDefault();
+          const form = e.target;
+          const storeName = form.storeName.value.trim();
+          const address = form.address.value.trim();
+          const type = form.type.value.trim();
+
+          try {
+            // Geocode the address
+            const { lat, lng } = await geocodeAddress(address);
+            const location = new GeoPoint(lat, lng);
+
+            // Prepare data to update
+            const updatedData = {
+              storeName,
+              address,
+              type,
+              location,
+            };
+
+            // Save to Firestore
+            const docRef = doc(db, "restaurants", restaurantData.id);
+            await updateDoc(docRef, updatedData);
+
+            // Update local state
+            setRestaurantData((prev) => ({ ...prev, ...updatedData }));
+            alert("Restaurant info updated successfully.");
+          } catch (err) {
+            console.error("Error updating restaurant info:", err);
+            alert("Failed to update restaurant info or geolocation.");
+          }
+        }}
+      >
+        <h2 className="text-lg font-semibold mb-2">Update Restaurant Info</h2>
+
+        <div>
+          <label className="block text-sm font-medium">Store Name</label>
+          <input
+            name="storeName"
+            defaultValue={restaurantData.storeName || ""}
+            required
+            className="mt-1 w-full border px-3 py-2 rounded"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Address</label>
+          <input
+            name="address"
+            defaultValue={restaurantData.address || ""}
+            required
+            className="mt-1 w-full border px-3 py-2 rounded"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Restaurant Type</label>
+          <input
+            name="type"
+            defaultValue={restaurantData.type || ""}
+            required
+            className="mt-1 w-full border px-3 py-2 rounded"
+          />
+        </div>
+
+        <button
+          type="submit"
+          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+        >
+          Save Changes
+        </button>
+      </form>
     </div>
   );
 }
 
 
 /*
-*** a form to set up and update restaurant manager information (ensure all restaurant managers have same fields)
-*** Restaurant manager logs in and updates menu.
+*** a form to set up and update restaurant information (ensure all restaurant managers have same fields)
 
+Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
 Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
 Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
 
@@ -104,4 +216,6 @@ Advanced: the reason orders are in systemFiles and not restaurant:
 
 
 # validity of address is "enforced" by the restaurant manager wanting sales. Advanced: further enforced by a courier message to admin if unable to access site.
+# reused components:
+UserPage & RestaurantPage // ADDRESS to GEOLOCATION: OpenCage API -> async function geocodeAddress(address) { ...
 */

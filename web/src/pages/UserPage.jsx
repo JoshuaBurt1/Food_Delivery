@@ -10,7 +10,6 @@ import {
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { Navigate } from "react-router-dom";
-
 import { MapContainer, TileLayer, Marker, Popup, useMap} from "react-leaflet";
 import L from "leaflet";
 
@@ -483,7 +482,7 @@ export default function UserPage() {
               icon={restaurantIcon}
             >
               <Popup>
-                <strong>{r.name}</strong>
+                <strong>{r.storeName}</strong>
                 <br />
                 {r.address}
                 <br />
@@ -514,7 +513,7 @@ export default function UserPage() {
                     onClick={() => setExpandedRestaurantId(isExpanded ? null : r.id)}
                   >
                     <h4 className="font-semibold">
-                      {r.name}
+                      {r.storeName}
                       {distance ? (
                         <span className="text-sm text-gray-600">
                           {" "}— {distance} km away
