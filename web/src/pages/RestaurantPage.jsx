@@ -7,6 +7,7 @@ import {
   getDocs,
   addDoc,
   GeoPoint,
+  Timestamp,
   doc,
   updateDoc,
 } from "firebase/firestore";
@@ -34,12 +35,29 @@ async function geocodeAddress(address) {
   }
 }
 
+// OPENING/CLOSING hours Functions
+function parseHoursArray(hoursArray) {
+  const result = {};
+  hoursArray.forEach((dayObj) => {
+    const [day, times] = Object.entries(dayObj)[0];
+    result[day] = times;
+  });
+  return result;
+}
+
+function formatHoursForFirestore(hoursObject) {
+  return Object.entries(hoursObject).map(([day, times]) => ({
+    [day]: times,
+  }));
+}
+
 export default function RestaurantPage() {
   const [user, setUser] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [restaurantData, setRestaurantData] = useState(null);
   const [fetchingRestaurant, setFetchingRestaurant] = useState(true);
   const [error, setError] = useState("");
+  const [hoursState, setHoursState] = useState({});
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -48,6 +66,13 @@ export default function RestaurantPage() {
     });
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (restaurantData?.hours) {
+      const parsed = parseHoursArray(restaurantData.hours);
+      setHoursState(parsed);
+    }
+  }, [restaurantData]);
 
   useEffect(() => {
     if (!user) return;
@@ -74,14 +99,27 @@ export default function RestaurantPage() {
         }
 
         // No match found: create a new restaurant document
-       const newRestaurant = {
-        email: user.email,
-        name: user.displayName || "Unnamed Restaurant",
-        address: "",
-        phone: "",
-        createdAt: new Date(),
-        status: "pending-setup",
-      };
+        const newRestaurant = {
+          address: "",
+          createdAt: Timestamp.fromDate(new Date()),
+          email: user.email,
+          hours: [
+            { Monday: { Opening: "0900", Closing: "1700" } },
+            { Tuesday: { Opening: "0900", Closing: "1700" } },
+            { Wednesday: { Opening: "0900", Closing: "1700" } },
+            { Thursday: { Opening: "0900", Closing: "1700" } },
+            { Friday: { Opening: "0900", Closing: "1700" } },
+            { Saturday: { Opening: "0900", Closing: "1700" } },
+            { Sunday: { Opening: "0900", Closing: "1700" } },
+          ],
+          location: new GeoPoint(90, 0),
+          name: user.displayName,
+          phone: "",
+          rating: 10,
+          storeName: "",
+          totalOrders: 0,
+          type: ""
+        };
 
         const docRef = await addDoc(restaurantsRef, newRestaurant);
         await updateDoc(docRef, { restaurantId: docRef.id });
@@ -108,11 +146,16 @@ export default function RestaurantPage() {
         Welcome, {user.displayName} (Restaurant Manager)
       </h1>
 
-      {/* ✅ Uneditable Info Section */}
+      {/* Uneditable Info Section */}
       <div className="mt-6 bg-gray-100 p-4 rounded-md shadow">
-        <h2 className="text-lg font-semibold mb-2">Restaurant Details (Read-Only)</h2>
+        <h2 className="text-lg font-semibold mb-2">Restaurant Details</h2>
         <p><strong>Restaurant ID:</strong> {restaurantData.restaurantId}</p>
-        <p><strong>Created At:</strong> {restaurantData.createdAt?.toDate().toLocaleString()}</p>
+        <p><strong>Created At:</strong> {
+            restaurantData.createdAt?.toDate
+              ? restaurantData.createdAt.toDate().toLocaleString()
+              : new Date(restaurantData.createdAt).toLocaleString()
+          }
+        </p>
         <p><strong>Email:</strong> {restaurantData.email}</p>
         <p><strong>Manager Name:</strong> {restaurantData.name}</p>
         <p><strong>Location:</strong> Lat: {restaurantData.location?.latitude}, Lng: {restaurantData.location?.longitude}</p>
@@ -120,7 +163,7 @@ export default function RestaurantPage() {
         <p><strong>Total Orders:</strong> {restaurantData.totalOrders}</p>
       </div>
 
-      {/* ✅ Editable Form */}
+      {/* Editable Form */}
       <form
         className="mt-6 space-y-4 max-w-md"
         onSubmit={async (e) => {
@@ -134,6 +177,7 @@ export default function RestaurantPage() {
             // Geocode the address
             const { lat, lng } = await geocodeAddress(address);
             const location = new GeoPoint(lat, lng);
+            const formattedHours = formatHoursForFirestore(hoursState);
 
             // Prepare data to update
             const updatedData = {
@@ -141,6 +185,7 @@ export default function RestaurantPage() {
               address,
               type,
               location,
+              hours: formattedHours,
             };
 
             // Save to Firestore
@@ -187,6 +232,42 @@ export default function RestaurantPage() {
             className="mt-1 w-full border px-3 py-2 rounded"
           />
         </div>
+        {/* Hours Form Section */}
+        <div className="mt-8">
+          <h2 className="text-lg font-semibold mb-2">Weekly Hours</h2>
+
+          {Object.entries(hoursState).map(([day, { Opening, Closing }]) => (
+            <div key={day} className="flex items-center gap-4 mb-2">
+              <span className="w-20 font-medium">{day}</span>
+              <input
+                type="text"
+                name={`${day}-opening`}
+                value={Opening}
+                onChange={(e) =>
+                  setHoursState((prev) => ({
+                    ...prev,
+                    [day]: { ...prev[day], Opening: e.target.value },
+                  }))
+                }
+                placeholder="Opening (e.g. 0900)"
+                className="border px-2 py-1 rounded w-32"
+              />
+              <input
+                type="text"
+                name={`${day}-closing`}
+                value={Closing}
+                onChange={(e) =>
+                  setHoursState((prev) => ({
+                    ...prev,
+                    [day]: { ...prev[day], Closing: e.target.value },
+                  }))
+                }
+                placeholder="Closing (e.g. 1700)"
+                className="border px-2 py-1 rounded w-32"
+              />
+            </div>
+          ))}
+        </div>
 
         <button
           type="submit"
@@ -201,11 +282,13 @@ export default function RestaurantPage() {
 
 
 /*
-*** a form to set up and update restaurant information (ensure all restaurant managers have same fields)
 
+*** add phone number and menu to form
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
 Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
 Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
+
+Maybe: field to upload map logo
 
 Advanced: Restaurant has to accept the order for it to be processed -> refund user if not accepted
 Advanced: the reason orders are in systemFiles and not restaurant:
@@ -219,3 +302,4 @@ Advanced: the reason orders are in systemFiles and not restaurant:
 # reused components:
 UserPage & RestaurantPage // ADDRESS to GEOLOCATION: OpenCage API -> async function geocodeAddress(address) { ...
 */
+

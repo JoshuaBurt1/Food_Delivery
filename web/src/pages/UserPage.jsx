@@ -6,6 +6,7 @@ import {
   addDoc,
   updateDoc,
   GeoPoint,
+  Timestamp,
   doc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -288,8 +289,8 @@ export default function UserPage() {
 
         const newUser = {
           email: user.email,
-          name: user.displayName || "Unnamed User",
-          createdAt: new Date(),
+          name: user.displayName,
+          createdAt: Timestamp.fromDate(new Date()),
           deliveryLocation: new GeoPoint(90, 0),
           address: "",
         };
@@ -557,6 +558,7 @@ export default function UserPage() {
                         </>
                       )}
                     </p>
+                    <p className="text-sm text-gray-700">Rating: {r.rating}</p>
 
                     {/* Only show available menu items */}
                     {isExpanded && r.menu && r.menu.filter(item => item.available).length > 0 && (
@@ -604,6 +606,8 @@ export default function UserPage() {
 
 
 /*
+*** add phone number
+*** if the opening and closing time is the same, the store is closed, not open
 * replace tailwind with regular css or get tailwind working
 * On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
 

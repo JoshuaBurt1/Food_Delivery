@@ -98,7 +98,7 @@ export default function CourierPage() {
 
             const newCourier = {
               email: user.email,
-              name: user.displayName || "Unnamed Courier",
+              name: user.displayName,
               earnings: 0,
               location: new GeoPoint(latitude, longitude),
               movementFlag: "inactive",
@@ -275,6 +275,7 @@ export default function CourierPage() {
 
 /*
 TODO
+*** add phone number
 * inactivityTimer: initially set to 0; increases if gps value does not change by a significant amount
 * movementFlag: initially set to inactive; set to inactive if inactivityTimer > threshold (10min)
 * Job disclosure form on first login: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
