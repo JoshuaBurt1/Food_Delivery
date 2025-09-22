@@ -94,6 +94,16 @@ function zoomLevelToKm(zoom) {
   return Math.min(radius, 100); // restaurants will not show over 100km from address
 }
 
+function MapSetTo({ position }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) {
+      map.setView(position, map.getZoom()); 
+    }
+  }, [position, map]);
+  return null;
+}
+
 // ADDRESS to GEOLOCATION: OpenCage API
 async function geocodeAddress(address) {
   const apiKey = "183a5a8cb47547249e4b3a3a44e9e24f";
@@ -132,6 +142,83 @@ function getDistanceInKm(lat1, lon1, lat2, lon2) {
   return (R * c).toFixed(2); // distance in km, rounded to 2 decimals
 }
 
+// RESTAURANT OPEN TIMES
+function isRestaurantOpenToday(hoursArray, now = new Date()) {
+  const days = [
+    "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"
+  ];
+  const today = days[now.getDay()];
+
+  const todayEntry = hoursArray.find((entry) => entry[today]);
+  if (!todayEntry || !todayEntry[today]) return false;
+
+  const { Opening, Closing } = todayEntry[today];
+
+  if (!Opening || !Closing || Opening.length !== 4 || Closing.length !== 4) {
+    return false;
+  }
+
+  const openHour = parseInt(Opening.slice(0, 2), 10);
+  const openMinute = parseInt(Opening.slice(2), 10);
+  const closeHour = parseInt(Closing.slice(0, 2), 10);
+  const closeMinute = parseInt(Closing.slice(2), 10);
+
+  const openTime = new Date(now);
+  openTime.setHours(openHour, openMinute, 0, 0);
+
+  const closeTime = new Date(now);
+  closeTime.setHours(closeHour, closeMinute, 0, 0);
+
+  if (closeTime <= openTime) {
+    // Overnight shift — close is technically next day
+    const closeTimeNextDay = new Date(closeTime);
+    closeTimeNextDay.setDate(closeTimeNextDay.getDate() + 1);
+
+    // Now is between opening and midnight → open
+    if (now >= openTime) {
+      return now <= closeTimeNextDay;
+    }
+
+    // Now is after midnight but before close → still open
+    const yesterday = new Date(now);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const yesterdayEntry = hoursArray.find((entry) => entry[days[yesterday.getDay()]]);
+    if (!yesterdayEntry || !yesterdayEntry[days[yesterday.getDay()]]) return false;
+
+    const { Opening: yOpen, Closing: yClose } = yesterdayEntry[days[yesterday.getDay()]];
+    if (!yOpen || !yClose || yOpen.length !== 4 || yClose.length !== 4) return false;
+
+    const yOpenHour = parseInt(yOpen.slice(0, 2), 10);
+    const yOpenMinute = parseInt(yOpen.slice(2), 10);
+    const yCloseHour = parseInt(yClose.slice(0, 2), 10);
+    const yCloseMinute = parseInt(yClose.slice(2), 10);
+
+    const yOpenTime = new Date(now);
+    yOpenTime.setDate(now.getDate() - 1);
+    yOpenTime.setHours(yOpenHour, yOpenMinute, 0, 0);
+
+    const yCloseTime = new Date(now);
+    yCloseTime.setHours(yCloseHour, yCloseMinute, 0, 0);
+
+    if (yCloseTime <= yOpenTime) {
+      yCloseTime.setDate(yCloseTime.getDate() + 1); // make close time next day
+    }
+
+    return now >= yOpenTime && now <= yCloseTime;
+  }
+
+  // Normal same-day hours
+  return now >= openTime && now <= closeTime;
+}
+
+function formatTime(timeStr) {
+  if (!timeStr || timeStr.length !== 4) return "Invalid";
+  const hours = timeStr.slice(0, 2);
+  const minutes = timeStr.slice(2);
+  return `${hours}:${minutes}`;
+}
+
 export default function UserPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -143,7 +230,9 @@ export default function UserPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [expandedRestaurantId, setExpandedRestaurantId] = useState(null);
   const [mapInstance, setMapInstance] = useState(null);
-  const [searchRadius, setSearchRadius] = useState(25); // default
+  const [searchRadius, setSearchRadius] = useState(25); // default 25 km search radius
+  const [currentDateTime, setCurrentDateTime] = useState(new Date());
+  const [userLatLng, setUserLatLng] = useState([44.413922, -79.707506]); // Georgian Mall Family Dental as fallback
 
   // Auth listener
   useEffect(() => {
@@ -152,6 +241,14 @@ export default function UserPage() {
       setLoading(false);
     });
     return () => unsub();
+  }, []);
+
+    // Time updated every minute
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentDateTime(new Date());
+    }, 60000);
+    return () => clearInterval(interval);
   }, []);
 
   // Fetch or create user document
@@ -176,6 +273,15 @@ export default function UserPage() {
         if (matchedDoc) {
           const userDoc = { id: matchedDoc.id, ...matchedDoc.data() };
           setUserData(userDoc);
+
+          // Set lat/lng if available
+          if (userDoc.deliveryLocation) {
+            setUserLatLng([
+              userDoc.deliveryLocation.latitude,
+              userDoc.deliveryLocation.longitude,
+            ]);
+          }
+
           setAddressInput(userDoc.address || "");
           setFetchingUser(false);
           return;
@@ -235,18 +341,20 @@ export default function UserPage() {
     try {
       const { lat, lng } = await geocodeAddress(addressInput.trim());
 
+      // Update Firestore
       const userRef = doc(db, "users", userData.id);
       const updatedFields = {
         address: addressInput.trim(),
         deliveryLocation: new GeoPoint(lat, lng),
       };
-
       await updateDoc(userRef, updatedFields);
 
+      // Update local state
       setUserData((prev) => ({
         ...prev,
         ...updatedFields,
       }));
+      setUserLatLng([lat, lng]); // ⬅️ this updates the map
       alert("Address updated successfully!");
     } catch (err) {
       setError("Failed to geocode address. Please try a different one.");
@@ -265,12 +373,6 @@ export default function UserPage() {
     );
 
   if (!user) return <Navigate to="/login" />;
-
-  // Get lat/lng from userData.deliveryLocation or fallback to default coords
-  const userLatLng =
-    userData?.deliveryLocation
-      ? [userData.deliveryLocation.latitude, userData.deliveryLocation.longitude]
-      : [44.413922, -79.707506]; // Georgian Mall Family Dental as fallback
 
   const restaurantsWithinRange = restaurants
   .map((r) => {
@@ -348,10 +450,11 @@ export default function UserPage() {
       <div className="h-[500px] w-full rounded overflow-hidden border border-gray-300 mt-4">
         <MapContainer
           center={userLatLng}
-          zoom={9}
-          scrollWheelZoom={true}
+          zoom={13}
+          scrollWheelZoom={false}
           style={{ height: "300px", width: "300px" }}
         >
+          <MapSetTo position={userLatLng} />
           <ZoomToRadius
             setSearchRadius={setSearchRadius}
             setMapInstance={setMapInstance}
@@ -390,7 +493,7 @@ export default function UserPage() {
           ))}
         </MapContainer>
       </div>
-      <h2 className="mt-8 text-xl">Nearby Restaurants within {searchRadius} km</h2>
+      <h2 className="mt-8 text-xl">Nearby Open Restaurants within {searchRadius} km</h2>
       <div className="mt-4 space-y-6">
         {sortedTypes.map((type) => (
           <div key={type}>
@@ -423,6 +526,38 @@ export default function UserPage() {
                       )}
                     </h4>
                     <p className="text-sm text-gray-700">{r.address}</p>
+                    <p className="font-semibold">
+                      {r.hours && (
+                        <>
+                          <span
+                            className={`ml-2 text-sm font-medium ${
+                              isRestaurantOpenToday(r.hours, currentDateTime)
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {isRestaurantOpenToday(r.hours, currentDateTime) ? "Open " : "Closed "}
+                          </span>
+
+                          {/* Show today’s hours inline */}
+                          <span className="ml-2 text-sm text-gray-500">
+                            (
+                            {(() => {
+                              const dayName = new Date().toLocaleDateString("en-US", {
+                                weekday: "long",
+                              });
+                              const todayHours = r.hours.find((entry) => entry[dayName]);
+                              if (!todayHours) return "No hours set";
+
+                              const opening = todayHours[dayName].Opening;
+                              const closing = todayHours[dayName].Closing;
+                              return `${formatTime(opening)} - ${formatTime(closing)}`;
+                            })()}
+                            )
+                          </span>
+                        </>
+                      )}
+                    </p>
 
                     {/* Only show available menu items */}
                     {isExpanded && r.menu && r.menu.filter(item => item.available).length > 0 && (
@@ -469,19 +604,21 @@ export default function UserPage() {
 
 
 
-/* 
-*** only show restaurants that are open (make a night restaurant in database to test); need date and time in app
-*** To reduce search results:
+/*
+* replace tailwind with regular css or get tailwind working
+* On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
+
+Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
+Later: Special restaurant instructions (allergy)
+Later: Special courier instructions (gated entry password...)
+Later: Show courier moving on map (car icon)
+Later: Do not allow orders on closed stores, do not show closed stores, do not retrieve closed stores
+Later: If a courier is not in range of the closing time of a restaurant (show the location, but do not allow orders)
+Later: To reduce search results (Fetch restaurants):
     ~ 1. filter all by distance (max distance up to 100km)
     ~ 2. filter by open hours
     ~ 3. no places with the same name after 5 occurances
     ~ 4. gather all result witin 100km from database on a single request, only show results based on map +/- distance to reduce database reads
-* replace tailwind with regular css or get tailwind working
-* On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
-Later: Add a precise location pointer on clicking the map
-Later: Special restaurant instructions (allergy)
-Later: Special courier instructions (gated entry password...)
-Later: Show courier moving on map (car icon)
 
 Maybe: Since anyone can create a restaurant, many can appear on the map. Preferential appearance based on totalOrders from unique userId. Advanced (restaurant): Paid preferential appearance option like Google Search.
 Maybe: Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
