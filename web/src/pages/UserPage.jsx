@@ -76,15 +76,12 @@ function ZoomToRadius({ setSearchRadius, setMapInstance }) {
 }
 
 function zoomLevelToKm(zoom) {
-  // Approximate mapping from Leaflet zoom level to radius in km
+  // Leaflet zoom level to radius (km)
   const zoomToKm = {
-    5: 1000,
-    6: 500,
-    7: 300,
-    8: 200,
-    9: 100,
+    8: 100,
+    9: 75,
     10: 50,
-    11: 15,
+    11: 25,
     12: 10,
     13: 5,
     14: 2.5,
@@ -93,9 +90,8 @@ function zoomLevelToKm(zoom) {
     17: 0.5,
     18: 0.25,
   };
-
-  const radius = zoomToKm[zoom] || 500;
-  return Math.min(radius, 500); // Clamp max radius to 500km
+  const radius = zoomToKm[zoom] || 100;
+  return Math.min(radius, 100); // restaurants will not show over 100km from address
 }
 
 // ADDRESS to GEOLOCATION: OpenCage API
@@ -274,7 +270,7 @@ export default function UserPage() {
   const userLatLng =
     userData?.deliveryLocation
       ? [userData.deliveryLocation.latitude, userData.deliveryLocation.longitude]
-      : [51.505, -0.09]; // London as fallback
+      : [44.413922, -79.707506]; // Georgian Mall Family Dental as fallback
 
   const restaurantsWithinRange = restaurants
   .map((r) => {
@@ -394,7 +390,7 @@ export default function UserPage() {
           ))}
         </MapContainer>
       </div>
-      <h2 className="mt-8 text-xl">Nearby Restaurants</h2>
+      <h2 className="mt-8 text-xl">Nearby Restaurants within {searchRadius} km</h2>
       <div className="mt-4 space-y-6">
         {sortedTypes.map((type) => (
           <div key={type}>
@@ -474,7 +470,12 @@ export default function UserPage() {
 
 
 /* 
-* only show restaurants that are open (make a night restaurant in database to test)
+*** only show restaurants that are open (make a night restaurant in database to test); need date and time in app
+*** To reduce search results:
+    ~ 1. filter all by distance (max distance up to 100km)
+    ~ 2. filter by open hours
+    ~ 3. no places with the same name after 5 occurances
+    ~ 4. gather all result witin 100km from database on a single request, only show results based on map +/- distance to reduce database reads
 * replace tailwind with regular css or get tailwind working
 * On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
 Later: Add a precise location pointer on clicking the map
@@ -492,4 +493,6 @@ Advanced: order from multiple restaurants in one order.
 
 
 # Assumes GPS is generally static, user can modify in input section
+# Search radius: start local at 25km (small selection -> limited search results)
+                 max distance at 100km (some people might want specialty takeout -> issue with ordering large amount of results)
 */
