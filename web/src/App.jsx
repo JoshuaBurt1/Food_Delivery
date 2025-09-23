@@ -12,6 +12,9 @@ import Login from "./pages/Login";
 import UserPage from "./pages/UserPage";
 import RestaurantPage from "./pages/RestaurantPage";
 import CourierPage from "./pages/CourierPage";
+import AdminPage from "./pages/AdminPage";
+import OrderPage from "./pages/OrderPage";
+
 import 'leaflet/dist/leaflet.css';
 
 function App() {
@@ -28,6 +31,8 @@ function App() {
               <Route path="/user" element={<UserPage />} />
               <Route path="/restaurant" element={<RestaurantPage />} />
               <Route path="/courier" element={<CourierPage />} />
+              <Route path="/admin" element={<AdminPage />} />
+              <Route path="/user/:restaurantName/order" element={<OrderPage />} />
             </Routes>
           </div>
       </div>

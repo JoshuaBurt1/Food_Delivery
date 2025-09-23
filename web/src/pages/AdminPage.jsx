@@ -1,3 +1,8 @@
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+
+export default function AdminPage() {
+}
 /*
 * no role, no link in navigation, separate admin login
 

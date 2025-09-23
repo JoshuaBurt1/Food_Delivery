@@ -10,7 +10,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { MapContainer, TileLayer, Marker, Popup, useMap} from "react-leaflet";
 import L from "leaflet";
 
@@ -207,6 +207,8 @@ export default function UserPage() {
   const [userLatLng, setUserLatLng] = useState([44.413922, -79.707506]); // Georgian Mall Family Dental as fallback
   const [allRestaurants, setAllRestaurants] = useState([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState([]);
+  const navigate = useNavigate();
+
 
   // Auth listener
   useEffect(() => {
@@ -529,7 +531,7 @@ export default function UserPage() {
 
         </MapContainer>
       </div>
-      <h2 className="mt-8 text-xl">Nearby Open Restaurants within {searchRadius} km</h2>
+      <h2 className="mt-8 text-xl">Nearby Restaurants within {searchRadius} km</h2>
       <div className="mt-4 space-y-6">
         {filteredTypes.map((type) => (
         <div key={type}>
@@ -547,7 +549,10 @@ export default function UserPage() {
                 <li
                   key={r.id}
                   className="border p-2 rounded shadow cursor-pointer"
-                  onClick={() => setExpandedRestaurantId(isExpanded ? null : r.id)}
+                  onClick={() => {
+                    const encodedName = encodeURIComponent(r.storeName);
+                    navigate(`/user/${encodedName}/order`, { state: { restaurant: r } });
+                  }}
                 >
                     <h4 className="font-semibold">
                       {r.storeName} — Rating: {r.rating}
