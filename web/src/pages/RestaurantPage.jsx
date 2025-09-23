@@ -70,6 +70,61 @@ export default function RestaurantPage() {
     available: true,
   });
 
+  // MENU
+  function handleMenuChange(index, field, value) {
+    const updatedMenu = [...restaurantData.menu];
+    updatedMenu[index] = { ...updatedMenu[index], [field]: value };
+
+    setRestaurantData((prev) => ({
+      ...prev,
+      menu: updatedMenu,
+    }));
+  }
+
+  function updateMenuItem(index) {
+    const updatedMenu = restaurantData.menu.map((item, i) =>
+      i === index
+        ? {
+            ...item,
+            calories: parseInt(item.calories),
+            price: parseFloat(item.price),
+          }
+        : item
+    );
+
+    const docRef = doc(db, "restaurants", restaurantData.id);
+    updateDoc(docRef, { menu: updatedMenu })
+      .then(() => {
+        alert("Menu item updated.");
+        setRestaurantData((prev) => ({
+          ...prev,
+          menu: updatedMenu,
+        }));
+      })
+      .catch((err) => {
+        console.error("Update failed:", err);
+        alert("Failed to update menu item.");
+      });
+  }
+
+  function deleteMenuItem(index) {
+    const updatedMenu = restaurantData.menu.filter((_, i) => i !== index);
+
+    const docRef = doc(db, "restaurants", restaurantData.id);
+    updateDoc(docRef, { menu: updatedMenu })
+      .then(() => {
+        alert("Menu item deleted.");
+        setRestaurantData((prev) => ({
+          ...prev,
+          menu: updatedMenu,
+        }));
+      })
+      .catch((err) => {
+        console.error("Delete failed:", err);
+        alert("Failed to delete menu item.");
+      });
+  }
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -346,8 +401,8 @@ export default function RestaurantPage() {
         }}
         className="mt-6 space-y-4 bg-gray-50 p-4 rounded shadow"
       >
-        <h3 className="text-lg font-semibold">Add New Menu Item</h3>
-
+        {/* Add New Menu Item */}
+        <h2 className="text-lg font-semibold">Add New Menu Item</h2>
         <input
           type="text"
           placeholder="Name"
@@ -408,13 +463,97 @@ export default function RestaurantPage() {
         </button>
       </form>
 
+      {/* Current Menu */}
+      {restaurantData.menu && restaurantData.menu.length > 0 && (
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold mb-4">Current Menu Items</h2>
+
+          <ul className="space-y-4">
+            {restaurantData.menu.map((item, index) => (
+              <li
+                key={index}
+                className="border rounded p-4 flex flex-col sm:flex-row sm:items-start gap-4 bg-white shadow-sm"
+              >
+                <div className="flex items-start space-x-4 w-full">
+                  {item.imgUrl && (
+                    <img
+                      src={item.imgUrl}
+                      alt={item.name}
+                      style={{ width: "100px", height: "100px", objectFit: "cover" }}
+                      className="rounded"
+                    />
+                  )}
+                  <div className="flex-1 space-y-2">
+                    <input
+                      type="text"
+                      value={item.name}
+                      onChange={(e) => handleMenuChange(index, "name", e.target.value)}
+                      className="font-semibold w-full border px-2 py-1 rounded"
+                    />
+                    <textarea
+                      value={item.description}
+                      onChange={(e) => handleMenuChange(index, "description", e.target.value)}
+                      className="text-sm w-full border px-2 py-1 rounded"
+                    />
+                    <input
+                      type="number"
+                      value={item.calories}
+                      onChange={(e) => handleMenuChange(index, "calories", e.target.value)}
+                      placeholder="Calories"
+                      className="text-sm w-full border px-2 py-1 rounded"
+                    />
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={item.price}
+                      onChange={(e) => handleMenuChange(index, "price", e.target.value)}
+                      placeholder="Price"
+                      className="text-sm w-full border px-2 py-1 rounded"
+                    />
+                    <input
+                      type="text"
+                      value={item.imgUrl}
+                      onChange={(e) => handleMenuChange(index, "imgUrl", e.target.value)}
+                      placeholder="Image URL"
+                      className="text-sm w-full border px-2 py-1 rounded"
+                    />
+
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={item.available}
+                        onChange={(e) => handleMenuChange(index, "available", e.target.checked)}
+                      />
+                      Available
+                    </label>
+
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        onClick={() => updateMenuItem(index)}
+                        className="bg-blue-600 text-white px-3 py-1 rounded hover:bg-blue-700"
+                      >
+                        Update
+                      </button>
+                      <button
+                        onClick={() => deleteMenuItem(index)}
+                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
 
 
 /*
-*** add menu to form (add, update, delete)
 
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
 Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)

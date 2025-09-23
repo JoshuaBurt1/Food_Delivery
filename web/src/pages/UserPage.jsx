@@ -647,7 +647,7 @@ export default function UserPage() {
 
 * replace tailwind with regular css or get tailwind working
 
-Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
+Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise) or just use location services
 Later: Special restaurant instructions (allergy)
 Later: Special courier instructions (gated entry password...)
 Later: Show courier moving on map (car icon)
