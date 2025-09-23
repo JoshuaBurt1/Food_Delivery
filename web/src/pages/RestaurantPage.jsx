@@ -45,6 +45,9 @@ function parseHoursArray(hoursArray) {
   return result;
 }
 
+// PHONE
+const phoneRegex = /^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/;
+
 function formatHoursForFirestore(hoursObject) {
   return Object.entries(hoursObject).map(([day, times]) => ({
     [day]: times,
@@ -171,7 +174,13 @@ export default function RestaurantPage() {
           const form = e.target;
           const storeName = form.storeName.value.trim();
           const address = form.address.value.trim();
+          const phone = form.phone.value.trim();
           const type = form.type.value.trim();
+
+          if (!phoneRegex.test(phone)) {
+            alert("Please enter a valid phone number format (e.g. 123-456-7890)");
+            return;
+          }
 
           try {
             // Geocode the address
@@ -183,6 +192,7 @@ export default function RestaurantPage() {
             const updatedData = {
               storeName,
               address,
+              phone,
               type,
               location,
               hours: formattedHours,
@@ -218,6 +228,16 @@ export default function RestaurantPage() {
           <input
             name="address"
             defaultValue={restaurantData.address || ""}
+            required
+            className="mt-1 w-full border px-3 py-2 rounded"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium">Phone #</label>
+          <input
+            name="phone"
+            defaultValue={restaurantData.phone || ""}
             required
             className="mt-1 w-full border px-3 py-2 rounded"
           />
@@ -282,8 +302,8 @@ export default function RestaurantPage() {
 
 
 /*
+*** add menu to form (add, update, delete)
 
-*** add phone number and menu to form
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
 Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
 Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)

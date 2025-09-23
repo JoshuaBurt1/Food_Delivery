@@ -197,6 +197,7 @@ export default function UserPage() {
   const [userData, setUserData] = useState(null);
   const [fetchingUser, setFetchingUser] = useState(true);
   const [error, setError] = useState(null);
+  const [phoneInput, setPhoneInput] = useState("");
   const [addressInput, setAddressInput] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [expandedRestaurantId, setExpandedRestaurantId] = useState(null);
@@ -255,6 +256,7 @@ export default function UserPage() {
             ]);
           }
 
+          setPhoneInput(userDoc.phone || "");
           setAddressInput(userDoc.address || "");
           setFetchingUser(false);
           return;
@@ -265,6 +267,7 @@ export default function UserPage() {
           name: user.displayName,
           createdAt: Timestamp.fromDate(new Date()),
           deliveryLocation: new GeoPoint(90, 0),
+          phone: "",
           address: "",
         };
 
@@ -324,7 +327,8 @@ export default function UserPage() {
     setFilteredRestaurants(filtered);
   }, [searchRadius, userLatLng, allRestaurants]);
 
-  // Handle address update form submit
+  // Handle phone and address update form submit
+  const phoneRegex = /^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/;
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     if (!userData) return;
@@ -334,33 +338,41 @@ export default function UserPage() {
       return;
     }
 
+    if (!phoneRegex.test(phoneInput.trim())) {
+      alert("Please enter a valid phone number (e.g. 555-123-4567).");
+      return;
+    }
+
     setSavingProfile(true);
     setError(null);
 
     try {
       const { lat, lng } = await geocodeAddress(addressInput.trim());
 
-      // Update Firestore
       const userRef = doc(db, "users", userData.id);
       const updatedFields = {
         address: addressInput.trim(),
         deliveryLocation: new GeoPoint(lat, lng),
+        phone: phoneInput.trim(),
       };
+
       await updateDoc(userRef, updatedFields);
 
-      // Update local state
       setUserData((prev) => ({
         ...prev,
         ...updatedFields,
       }));
-      setUserLatLng([lat, lng]); // this updates the map
-      alert("Address updated successfully!");
+
+      setUserLatLng([lat, lng]);
+      alert("Profile updated successfully!");
     } catch (err) {
-      setError("Failed to geocode address. Please try a different one.");
+      console.error("Failed to update profile:", err);
+      setError("Failed to update your profile. Please try again.");
     } finally {
       setSavingProfile(false);
     }
   };
+
 
   if (loading || fetchingUser) return <div>Loading...</div>;
 
@@ -383,38 +395,54 @@ export default function UserPage() {
   }, {});
 
   const filteredTypes = Object.keys(groupedFilteredByType).sort();
-
-  return (
+    return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">
         Welcome, {user.displayName} (User)
       </h1>
+      <form onSubmit={handleProfileSubmit}>
+        <table className="w-full table-fixed border border-gray-300 mt-4">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="text-left px-4 py-2 border-b w-1/6">Field</th>
+              <th className="text-left px-4 py-2 border-b w-1/3">Value</th>
+              <th className="text-left px-4 py-2 border-b w-1/6">Actions</th>
+            </tr>
+          </thead>
 
-      <table className="w-full table-fixed border border-gray-300 mt-4">
-        <thead className="bg-gray-100">
-          <tr>
-            <th className="text-left px-4 py-2 border-b w-1/6">Field</th>
-            <th className="text-left px-4 py-2 border-b w-1/3">Value</th>
-            <th className="text-left px-4 py-2 border-b w-1/6">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td className="px-4 py-2 border-b align-top">Name</td>
-            <td className="px-4 py-2 border-b" colSpan={2}>
-              {userData?.name || user.displayName}
-            </td>
-          </tr>
-          <tr>
-            <td className="px-4 py-2 border-b align-top">Email</td>
-            <td className="px-4 py-2 border-b" colSpan={2}>
-              {userData?.email || user.email}
-            </td>
-          </tr>
-          <tr>
-            <td className="px-4 py-2 border-b align-top">Address</td>
-            <td className="px-4 py-2 border-b">
-              <form onSubmit={handleProfileSubmit}>
+          <tbody>
+            {/* Non-editable fields */}
+            <tr>
+              <td className="px-4 py-2 border-b align-top">Name</td>
+              <td className="px-4 py-2 border-b" colSpan={2}>
+                {userData?.name || user.displayName}
+              </td>
+            </tr>
+            <tr>
+              <td className="px-4 py-2 border-b align-top">Email</td>
+              <td className="px-4 py-2 border-b" colSpan={2}>
+                {userData?.email || user.email}
+              </td>
+            </tr>
+
+            {/* Editable Phone input */}
+            <tr>
+              <td className="px-4 py-2 border-b align-top">Phone</td>
+              <td className="px-4 py-2 border-b">
+                <input
+                  type="tel"
+                  className="border px-4 py-2 text-base rounded w-full max-w-[60ch]"
+                  value={phoneInput}
+                  onChange={(e) => setPhoneInput(e.target.value)}
+                  placeholder="555-123-4567"
+                />
+              </td>
+            </tr>
+
+            {/* Editable Address input */}
+            <tr>
+              <td className="px-4 py-2 border-b align-top">Address</td>
+              <td className="px-4 py-2 border-b">
                 <input
                   type="text"
                   className="border px-4 py-2 text-base rounded w-full max-w-[60ch]"
@@ -422,20 +450,22 @@ export default function UserPage() {
                   onChange={(e) => setAddressInput(e.target.value)}
                   placeholder="123 Main St, City, Country"
                 />
-              </form>
-            </td>
-            <td className="px-4 py-2 border-b align-top">
-              <button
-                onClick={handleProfileSubmit}
-                className="bg-blue-600 text-white px-4 py-2 rounded text-sm w-full"
-                disabled={savingProfile}
-              >
-                {savingProfile ? "Saving..." : "Update"}
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+              </td>
+              {/* The button spans two rows */}
+              <td className="px-4 py-2 border-b align-top" rowSpan={1}>
+                <button
+                  type="submit"
+                  className="bg-blue-600 text-white px-4 py-2 rounded text-sm w-full"
+                  disabled={savingProfile}
+                >
+                  {savingProfile ? "Saving..." : "Update"}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </form>
+
       <div className="h-[500px] w-full rounded overflow-hidden border border-gray-300 mt-4">
         <MapContainer
           center={userLatLng}
@@ -465,17 +495,38 @@ export default function UserPage() {
             <Popup>Your delivery location</Popup>
           </Marker>
 
-          {allRestaurants.map((r) =>
-            r.location?.latitude && r.location?.longitude ? (
-              <Marker
-                key={r.id}
-                position={[r.location.latitude, r.location.longitude]}
-                icon={restaurantIcon}
-              >
-                <Popup>{r.name}</Popup>
-              </Marker>
-            ) : null
-          )}
+          {allRestaurants
+          .map((r) => {
+            const rLat = r.location?.latitude;
+            const rLng = r.location?.longitude;
+            if (!rLat || !rLng) return null;
+
+            const distance = getDistanceInKm(
+              userLatLng[0],
+              userLatLng[1],
+              rLat,
+              rLng
+            );
+
+            return { ...r, distance: parseFloat(distance) };
+          })
+          .filter((r) => r && r.distance <= 100)
+          .map((r) => (
+            <Marker
+              key={r.id}
+              position={[r.location.latitude, r.location.longitude]}
+              icon={restaurantIcon}
+            >
+            <Popup>
+              {r.storeName}
+              <br />
+              {r.address}
+              <br />
+              {r.distance.toFixed(2)} km away
+            </Popup>
+            </Marker>
+          ))}
+
         </MapContainer>
       </div>
       <h2 className="mt-8 text-xl">Nearby Open Restaurants within {searchRadius} km</h2>
@@ -499,7 +550,7 @@ export default function UserPage() {
                   onClick={() => setExpandedRestaurantId(isExpanded ? null : r.id)}
                 >
                     <h4 className="font-semibold">
-                      {r.storeName}
+                      {r.storeName} — Rating: {r.rating}
                       {distance ? (
                         <span className="text-sm text-gray-600">
                           {" "}— {distance} km away
@@ -543,7 +594,6 @@ export default function UserPage() {
                         </>
                       )}
                     </p>
-                    <p className="text-sm text-gray-700">Rating: {r.rating}</p>
 
                     {/* Only show available menu items */}
                     {isExpanded && r.menu && r.menu.filter(item => item.available).length > 0 && (
@@ -591,8 +641,10 @@ export default function UserPage() {
 
 
 /*
-*** add phone number
-*** On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
+*** On user restaurant selection -> grid array of food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
+*** Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message)
+*** Better UI -> onClick of restaurant name loads UserPage restaurant order page
+
 * replace tailwind with regular css or get tailwind working
 
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)

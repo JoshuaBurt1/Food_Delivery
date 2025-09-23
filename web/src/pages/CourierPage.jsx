@@ -276,11 +276,12 @@ export default function CourierPage() {
 /*
 TODO
 *** add phone number
+*** Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)
+                 Job disclosure form: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
+                 obligation to select movementFlag updates if waiting; add phoneNumber field
+
 * inactivityTimer: initially set to 0; increases if gps value does not change by a significant amount
 * movementFlag: initially set to inactive; set to inactive if inactivityTimer > threshold (10min)
-* Job disclosure form on first login: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
-  obligation to select movementFlag updates if waiting; add phoneNumber field
-
 * courier must be within a certain distance to accept a task
 * to start a task the courier must press an accept task button -> an enrouteOrder is created in systemFiles
 * courier must select deliveryStatus option area when 1. they pick up food from restaurant "in transit" and 2. deliver it to the customer "completed"
@@ -288,7 +289,6 @@ TODO
 * deliveryStatus: food location is either: 0. "at restaurant" (initial setting), 1. "in transit", or 2. "completed";
                 updates systemFiles field delivery status -> enrouteOrders or completedOrders depending on status
 * advanced: couriers with multiple tasks are possible [2 people in same area, around same time, order from the same McDonalds]; task gen function in systemFiles restaurant orders
-
 
 courierId: used by admin to identify the courier on a job task                                                    (essential for job)
 currentTask: used by admin to identify if the courier has a task <orderId>                                          [filled / empty]
