@@ -40,9 +40,13 @@ export default function OrderPage() {
   };
 
   const handleSubmitOrder = () => {
+    if (total === 0) {
+        alert("Please add at least one item to your order.");
+        return;
+    }
     alert(`Order submitted! Total: $${total.toFixed(2)}`);
     navigate("/user");
-  };
+};
 
   if (!restaurant) return <div>Loading...</div>;
 

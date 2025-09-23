@@ -40,28 +40,31 @@ function FitBoundsView({ markers }) {
   const [hasFit, setHasFit] = useState(false);
 
   useEffect(() => {
-    if (!markers.length || hasFit) return;
+    const savedZoom = sessionStorage.getItem("userMapZoom");
+
+    // Don't fit bounds if zoom already restored
+    if (markers.length < 2 || hasFit || savedZoom) return;
 
     const bounds = L.latLngBounds(markers);
-    map.fitBounds(bounds, { padding: [50, 50] });
+    map.fitBounds(bounds, { padding: [50, 50], maxZoom: 12 });
     setHasFit(true);
   }, [map, markers, hasFit]);
 
   return null;
 }
 
+
 function ZoomToRadius({ setSearchRadius, setMapInstance }) {
   const map = useMap();
 
   useEffect(() => {
-    setMapInstance(map); // so we can access it outside too
+    setMapInstance(map);
 
     function handleZoom() {
       const zoom = map.getZoom();
-
-      // Approximate radius formula based on zoom level
       const radius = zoomLevelToKm(zoom);
       setSearchRadius(radius);
+      sessionStorage.setItem("userMapZoom", zoom.toString()); //save zoom level during session
     }
 
     map.on("zoomend", handleZoom);
@@ -74,6 +77,7 @@ function ZoomToRadius({ setSearchRadius, setMapInstance }) {
 
   return null;
 }
+
 
 function zoomLevelToKm(zoom) {
   // Leaflet zoom level to radius (km)
@@ -96,13 +100,23 @@ function zoomLevelToKm(zoom) {
 
 function MapSetTo({ position }) {
   const map = useMap();
+
   useEffect(() => {
-    if (position) {
-      map.setView(position, map.getZoom()); 
+    if (!position) return;
+
+    const savedZoom = parseInt(sessionStorage.getItem("userMapZoom"));
+    const currentZoom = map.getZoom();
+
+    if (!isNaN(savedZoom)) {
+      map.setView(position, savedZoom); // use saved
+    } else {
+      map.setView(position, currentZoom); // fallback to current
     }
   }, [position, map]);
+
   return null;
 }
+
 
 // ADDRESS to GEOLOCATION: OpenCage API
 async function geocodeAddress(address) {
@@ -202,7 +216,7 @@ export default function UserPage() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [expandedRestaurantId, setExpandedRestaurantId] = useState(null);
   const [mapInstance, setMapInstance] = useState(null);
-  const [searchRadius, setSearchRadius] = useState(25); // default 25 km search radius
+  const [searchRadius, setSearchRadius] = useState(12); // default 10 km search radius
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [userLatLng, setUserLatLng] = useState([44.413922, -79.707506]); // Georgian Mall Family Dental as fallback
   const [allRestaurants, setAllRestaurants] = useState([]);
@@ -388,6 +402,7 @@ export default function UserPage() {
   if (!user) return <Navigate to="/login" />;
 
   const restaurantsWithinRange = filteredRestaurants;
+  const shouldFitBounds = restaurantsWithinRange.length > 0;
 
   const groupedFilteredByType = filteredRestaurants.reduce((acc, r) => {
     const type = r.type || "Other";
@@ -397,6 +412,8 @@ export default function UserPage() {
   }, {});
 
   const filteredTypes = Object.keys(groupedFilteredByType).sort();
+  console.log("Restoring zoom level:", sessionStorage.getItem("userMapZoom"));
+
     return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">
@@ -471,7 +488,7 @@ export default function UserPage() {
       <div className="h-[500px] w-full rounded overflow-hidden border border-gray-300 mt-4">
         <MapContainer
           center={userLatLng}
-          zoom={13}
+          zoom={parseInt(sessionStorage.getItem("userMapZoom")) || 11} //Restore session level or fallback to 11
           scrollWheelZoom={false}
           style={{ height: "300px", width: "300px" }}
         >
@@ -480,15 +497,17 @@ export default function UserPage() {
             setSearchRadius={setSearchRadius}
             setMapInstance={setMapInstance}
           />
-          <FitBoundsView
-            markers={[
-              userLatLng,
-              ...restaurantsWithinRange.map((r) => [
-                r.location.latitude,
-                r.location.longitude,
-              ]),
-            ]}
-          />
+          {shouldFitBounds && (
+            <FitBoundsView
+              markers={[
+                userLatLng,
+                ...restaurantsWithinRange.map((r) => [
+                  r.location.latitude,
+                  r.location.longitude,
+                ]),
+              ]}
+            />
+          )}
           <TileLayer
             attribution='&copy; <a href="https://osm.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
