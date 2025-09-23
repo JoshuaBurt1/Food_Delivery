@@ -61,6 +61,14 @@ export default function RestaurantPage() {
   const [fetchingRestaurant, setFetchingRestaurant] = useState(true);
   const [error, setError] = useState("");
   const [hoursState, setHoursState] = useState({});
+  const [newMenuItem, setNewMenuItem] = useState({
+    name: "",
+    description: "",
+    calories: "",
+    price: "",
+    imgUrl: "",
+    available: true,
+  });
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
@@ -296,6 +304,110 @@ export default function RestaurantPage() {
           Save Changes
         </button>
       </form>
+
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+
+          if (!newMenuItem.name || !newMenuItem.price) {
+            alert("Name and price are required.");
+            return;
+          }
+
+          const itemToAdd = {
+            ...newMenuItem,
+            calories: parseInt(newMenuItem.calories),
+            price: parseFloat(newMenuItem.price),
+          };
+
+          const updatedMenu = [...(restaurantData.menu || []), itemToAdd];
+
+          const docRef = doc(db, "restaurants", restaurantData.id);
+          updateDoc(docRef, { menu: updatedMenu })
+            .then(() => {
+              alert("Menu item added successfully.");
+              setNewMenuItem({
+                name: "",
+                description: "",
+                calories: "",
+                price: "",
+                imgUrl: "",
+                available: true,
+              });
+              setRestaurantData((prev) => ({
+                ...prev,
+                menu: updatedMenu,
+              }));
+            })
+            .catch((err) => {
+              console.error("Failed to add menu item:", err);
+              alert("Error adding menu item.");
+            });
+        }}
+        className="mt-6 space-y-4 bg-gray-50 p-4 rounded shadow"
+      >
+        <h3 className="text-lg font-semibold">Add New Menu Item</h3>
+
+        <input
+          type="text"
+          placeholder="Name"
+          value={newMenuItem.name}
+          onChange={(e) => setNewMenuItem({ ...newMenuItem, name: e.target.value })}
+          className="w-full border px-3 py-2 rounded"
+          required
+        />
+
+        <input
+          type="text"
+          placeholder="Description"
+          value={newMenuItem.description}
+          onChange={(e) => setNewMenuItem({ ...newMenuItem, description: e.target.value })}
+          className="w-full border px-3 py-2 rounded"
+        />
+
+        <input
+          type="number"
+          placeholder="Calories"
+          value={newMenuItem.calories}
+          onChange={(e) => setNewMenuItem({ ...newMenuItem, calories: e.target.value })}
+          className="w-full border px-3 py-2 rounded"
+        />
+
+        <input
+          type="number"
+          placeholder="Price"
+          step="0.01"
+          value={newMenuItem.price}
+          onChange={(e) => setNewMenuItem({ ...newMenuItem, price: e.target.value })}
+          className="w-full border px-3 py-2 rounded"
+          required
+        />
+
+        <input
+          type="text"
+          placeholder="Image URL"
+          value={newMenuItem.imgUrl}
+          onChange={(e) => setNewMenuItem({ ...newMenuItem, imgUrl: e.target.value })}
+          className="w-full border px-3 py-2 rounded"
+        />
+
+        <label className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            checked={newMenuItem.available}
+            onChange={(e) => setNewMenuItem({ ...newMenuItem, available: e.target.checked })}
+          />
+          Available
+        </label>
+
+        <button
+          type="submit"
+          className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+        >
+          Add Menu Item
+        </button>
+      </form>
+
     </div>
   );
 }
