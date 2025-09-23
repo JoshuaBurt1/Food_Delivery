@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../firebase";
-import Logo from "../components/Logo"; // ✅ Import the logo component
+import Logo from "../components/Logo"; // Import the logo component
 import "../index.css";
 
 export default function NavBar({ onSelectRole }) {

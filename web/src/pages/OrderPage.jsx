@@ -1,22 +1,51 @@
-import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useEffect, useState } from "react";
+import { onAuthStateChanged, getAuth } from "firebase/auth";
+import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { useNavigate, useLocation, useParams } from "react-router-dom";
+import { auth, db } from "../firebase";
 
 export default function OrderPage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { restaurantName } = useParams();
+  const { restaurantId } = useParams();
   const restaurant = location.state?.restaurant;
 
   const [quantities, setQuantities] = useState({});
   const [total, setTotal] = useState(0);
+  const [userId, setUserId] = useState(null);
+  const [userData, setUserData] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
 
+  // ✅ SINGLE auth listener
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
+      setAuthChecked(true);
+
+      if (user) {
+        setUserId(user.uid);
+        const userRef = doc(db, "users", user.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          setUserData(userSnap.data());
+        } else {
+          console.warn("No user document found");
+        }
+      } else {
+        navigate("/login");
+      }
+    });
+
+    return () => unsubscribe();
+  }, [navigate]);
+
+  // Redirect if no restaurant
   useEffect(() => {
     if (!restaurant) {
-      // If no restaurant is passed, redirect back
       navigate("/user");
     }
   }, [restaurant, navigate]);
 
+  // Calculate total price
   useEffect(() => {
     if (!restaurant?.menu) return;
     const newTotal = restaurant.menu.reduce((acc, item, idx) => {
@@ -39,16 +68,60 @@ export default function OrderPage() {
     }));
   };
 
-  const handleSubmitOrder = () => {
+  const handleSubmitOrder = async () => {
     if (total === 0) {
-        alert("Please add at least one item to your order.");
-        return;
+      alert("Please add at least one item to your order.");
+      return;
     }
-    alert(`Order submitted! Total: $${total.toFixed(2)}`);
-    navigate("/user");
-};
 
-  if (!restaurant) return <div>Loading...</div>;
+    try {
+      const restaurantOrdersRef = doc(db, "systemFiles", "restaurantOrders");
+      const docSnap = await getDoc(restaurantOrdersRef);
+
+      if (!docSnap.exists()) {
+        alert("Order system not initialized.");
+        return;
+      }
+
+      const data = docSnap.data();
+      const existingOrders = data.restaurantOrders || [];
+
+      const items = Object.entries(quantities)
+        .filter(([idx, qty]) => qty > 0 && restaurant.menu[idx])
+        .map(([idx, qty]) => ({
+          name: restaurant.menu[idx].name,
+          quantity: qty,
+        }));
+
+      const newOrder = {
+        createdAt: Timestamp.now(),
+        deliveryStatus: "at restaurant",
+        items,
+        orderId: `${restaurantId}_${existingOrders.length + 1}`,
+        restaurantId,
+        userId,
+      };
+
+      await updateDoc(restaurantOrdersRef, {
+        restaurantOrders: [...existingOrders, newOrder],
+      });
+
+      navigate("/payment", {
+        state: {
+          total,
+          restaurantName: restaurant.storeName,
+          items,
+        },
+      });
+    } catch (error) {
+      console.error("Error submitting order:", error);
+      alert("There was an error processing your order. Please try again.");
+    }
+  };
+
+  // Prevent premature rendering
+  if (!authChecked || !restaurant) return <div>Loading...</div>;
+  if (!userId) return null;
 
   const availableMenu = restaurant.menu?.filter(item => item.available) || [];
 
@@ -67,10 +140,7 @@ export default function OrderPage() {
         }}>
           <ul className="space-y-4">
             {availableMenu.map((item, index) => (
-              <li
-                key={index}
-                className="border rounded p-4 flex gap-4 items-start shadow-sm"
-              >
+              <li key={index} className="border rounded p-4 flex gap-4 items-start shadow-sm">
                 {item.imgUrl && (
                   <img
                     src={item.imgUrl}
@@ -111,3 +181,10 @@ export default function OrderPage() {
     </div>
   );
 }
+
+
+
+/*
+*** fix: orderNumber
+*** If the store is closed, orders cannot be placed
+*/

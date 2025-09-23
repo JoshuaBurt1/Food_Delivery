@@ -8,6 +8,8 @@ import {
   GeoPoint,
   Timestamp,
   doc,
+  setDoc,
+  getDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -249,22 +251,14 @@ export default function UserPage() {
 
     const fetchOrCreateUser = async () => {
       try {
-        const snapshot = await getDocs(usersRef);
+        const uid = user.uid; // 👈 get the Firebase Auth UID
+        const userRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userRef);
 
-        const matchedDoc = snapshot.docs.find((doc) => {
-          const data = doc.data();
-          const emailMatch = data.email === user.email;
-          const nameMatch =
-            data.name?.toLowerCase().trim() ===
-            user.displayName?.toLowerCase().trim();
-          return emailMatch || nameMatch;
-        });
-
-        if (matchedDoc) {
-          const userDoc = { id: matchedDoc.id, ...matchedDoc.data() };
+        if (userSnap.exists()) {
+          const userDoc = { id: uid, ...userSnap.data() };
           setUserData(userDoc);
 
-          // Set lat/lng if available
           if (userDoc.deliveryLocation) {
             setUserLatLng([
               userDoc.deliveryLocation.latitude,
@@ -278,6 +272,7 @@ export default function UserPage() {
           return;
         }
 
+        // Create new user doc using UID
         const newUser = {
           email: user.email,
           name: user.displayName,
@@ -287,10 +282,9 @@ export default function UserPage() {
           address: "",
         };
 
-        const docRef = await addDoc(usersRef, newUser);
-        await updateDoc(docRef, { userId: docRef.id });
+        await setDoc(userRef, newUser); // 👈 uses UID as document ID
 
-        setUserData({ id: docRef.id, userId: docRef.id, ...newUser });
+        setUserData({ id: uid, ...newUser });
         setAddressInput("");
         setFetchingUser(false);
       } catch (err) {
@@ -299,7 +293,6 @@ export default function UserPage() {
         setFetchingUser(false);
       }
     };
-
     fetchOrCreateUser();
   }, [user]);
 
@@ -412,7 +405,6 @@ export default function UserPage() {
   }, {});
 
   const filteredTypes = Object.keys(groupedFilteredByType).sort();
-  console.log("Restoring zoom level:", sessionStorage.getItem("userMapZoom"));
 
     return (
     <div className="p-6">
@@ -570,7 +562,8 @@ export default function UserPage() {
                   className="border p-2 rounded shadow cursor-pointer"
                   onClick={() => {
                     const encodedName = encodeURIComponent(r.storeName);
-                    navigate(`/user/${encodedName}/order`, { state: { restaurant: r } });
+                    const encodedId = encodeURIComponent(r.restaurantId);
+                    navigate(`/user/${encodedName}/${encodedId}/order`, { state: { restaurant: r } });
                   }}
                 >
                     <h4 className="font-semibold">
@@ -666,8 +659,7 @@ export default function UserPage() {
 
 /*
 *** On user restaurant selection -> grid array of food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
-*** Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message)
-*** Better UI -> onClick of restaurant name loads UserPage restaurant order page
+*** Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message; delete account)
 
 * replace tailwind with regular css or get tailwind working
 

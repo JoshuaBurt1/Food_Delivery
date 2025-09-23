@@ -554,6 +554,7 @@ export default function RestaurantPage() {
 
 
 /*
+*** Delete profile field
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
 Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
 Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
