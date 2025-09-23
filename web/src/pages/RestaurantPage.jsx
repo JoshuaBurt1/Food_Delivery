@@ -554,7 +554,10 @@ export default function RestaurantPage() {
 
 
 /*
-*** Delete profile field
+*** 1. each food item should have a prepTime time field, which is then passed to a new restaurantOrder. 
+    When that time elapses the task should show on the courier task list
+* Delete profile field (top right nav user UI)
+
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
 Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
 Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)

@@ -277,12 +277,12 @@ export default function UserPage() {
           email: user.email,
           name: user.displayName,
           createdAt: Timestamp.fromDate(new Date()),
-          deliveryLocation: new GeoPoint(90, 0),
+          deliveryLocation: new GeoPoint(44.413922, -79.707506),
           phone: "",
           address: "",
         };
 
-        await setDoc(userRef, newUser); // 👈 uses UID as document ID
+        await setDoc(userRef, newUser); // uses UID as document ID
 
         setUserData({ id: uid, ...newUser });
         setAddressInput("");
@@ -658,9 +658,7 @@ export default function UserPage() {
 
 
 /*
-*** On user restaurant selection -> grid array of food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
-*** Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message; delete account)
-
+* Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message; delete account)
 * replace tailwind with regular css or get tailwind working
 
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise) or just use location services

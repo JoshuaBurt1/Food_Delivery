@@ -275,8 +275,10 @@ export default function CourierPage() {
 
 /*
 TODO
-*** add phone number
-*** Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)
+*** 3. show restaurant orders on task list (after preparation time has elapsed)
+    4. if courier gps active and accepts (button); car icon appears on user's map
+* add phone number
+* Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)
                  Job disclosure form: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
                  obligation to select movementFlag updates if waiting; add phoneNumber field
 

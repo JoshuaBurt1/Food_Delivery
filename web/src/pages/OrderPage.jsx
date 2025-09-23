@@ -16,7 +16,7 @@ export default function OrderPage() {
   const [userData, setUserData] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
 
-  // ✅ SINGLE auth listener
+  // SINGLE auth listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(getAuth(), async (user) => {
       setAuthChecked(true);
@@ -185,6 +185,11 @@ export default function OrderPage() {
 
 
 /*
-*** fix: orderNumber
-*** If the store is closed, orders cannot be placed
+*** 2. pass the prepTime field to the new restaurantOrder
+* fix: orderNumber
+* payment split between: 
+~ Restaurant:	        Food revenue (minus platform commission)
+~ Delivery Driver:	    Delivery fee + tip (via platform)
+~ Platform (Delivery):	Commission + service fees
+* If the store is closed, orders cannot be placed
 */
