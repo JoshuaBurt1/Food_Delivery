@@ -288,7 +288,7 @@ Later: Add a precise location pointer on clicking the map (reason: the geolocato
 Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
 Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
 
-Maybe: field to upload map logo
+Maybe: field to upload logo that appears on map
 
 Advanced: Restaurant has to accept the order for it to be processed -> refund user if not accepted
 Advanced: the reason orders are in systemFiles and not restaurant:

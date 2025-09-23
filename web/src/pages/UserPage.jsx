@@ -154,7 +154,11 @@ function isRestaurantOpenToday(hoursArray, now = new Date()) {
 
   const { Opening, Closing } = todayEntry[today];
 
-  if (!Opening || !Closing || Opening.length !== 4 || Closing.length !== 4) {
+  if (
+    !Opening || !Closing ||
+    Opening.length !== 4 || Closing.length !== 4 ||
+    Opening === Closing // 🔒 Same open/close time → closed
+  ) {
     return false;
   }
 
@@ -169,46 +173,14 @@ function isRestaurantOpenToday(hoursArray, now = new Date()) {
   const closeTime = new Date(now);
   closeTime.setHours(closeHour, closeMinute, 0, 0);
 
+  // Overnight handling
   if (closeTime <= openTime) {
-    // Overnight shift — close is technically next day
     const closeTimeNextDay = new Date(closeTime);
     closeTimeNextDay.setDate(closeTimeNextDay.getDate() + 1);
-
-    // Now is between opening and midnight → open
-    if (now >= openTime) {
-      return now <= closeTimeNextDay;
-    }
-
-    // Now is after midnight but before close → still open
-    const yesterday = new Date(now);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const yesterdayEntry = hoursArray.find((entry) => entry[days[yesterday.getDay()]]);
-    if (!yesterdayEntry || !yesterdayEntry[days[yesterday.getDay()]]) return false;
-
-    const { Opening: yOpen, Closing: yClose } = yesterdayEntry[days[yesterday.getDay()]];
-    if (!yOpen || !yClose || yOpen.length !== 4 || yClose.length !== 4) return false;
-
-    const yOpenHour = parseInt(yOpen.slice(0, 2), 10);
-    const yOpenMinute = parseInt(yOpen.slice(2), 10);
-    const yCloseHour = parseInt(yClose.slice(0, 2), 10);
-    const yCloseMinute = parseInt(yClose.slice(2), 10);
-
-    const yOpenTime = new Date(now);
-    yOpenTime.setDate(now.getDate() - 1);
-    yOpenTime.setHours(yOpenHour, yOpenMinute, 0, 0);
-
-    const yCloseTime = new Date(now);
-    yCloseTime.setHours(yCloseHour, yCloseMinute, 0, 0);
-
-    if (yCloseTime <= yOpenTime) {
-      yCloseTime.setDate(yCloseTime.getDate() + 1); // make close time next day
-    }
-
-    return now >= yOpenTime && now <= yCloseTime;
+    return now >= openTime || now <= closeTimeNextDay;
   }
 
-  // Normal same-day hours
+  // Normal hours
   return now >= openTime && now <= closeTime;
 }
 
@@ -222,7 +194,6 @@ function formatTime(timeStr) {
 export default function UserPage() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [restaurants, setRestaurants] = useState([]);
   const [userData, setUserData] = useState(null);
   const [fetchingUser, setFetchingUser] = useState(true);
   const [error, setError] = useState(null);
@@ -233,6 +204,8 @@ export default function UserPage() {
   const [searchRadius, setSearchRadius] = useState(25); // default 25 km search radius
   const [currentDateTime, setCurrentDateTime] = useState(new Date());
   const [userLatLng, setUserLatLng] = useState([44.413922, -79.707506]); // Georgian Mall Family Dental as fallback
+  const [allRestaurants, setAllRestaurants] = useState([]);
+  const [filteredRestaurants, setFilteredRestaurants] = useState([]);
 
   // Auth listener
   useEffect(() => {
@@ -318,12 +291,38 @@ export default function UserPage() {
     (async () => {
       try {
         const snap = await getDocs(collection(db, "restaurants"));
-        setRestaurants(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        const fetched = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+
+        setAllRestaurants(fetched); //all restaurants on initial fetch appear on map
+        // only those restaurants user toggles with +/- appear on list (filtered by distance)
+
       } catch (err) {
         console.error("Error fetching restaurants:", err);
       }
     })();
   }, [user]);
+
+  // Inside useEffect or after fetching restaurants:
+  useEffect(() => {
+    const filtered = allRestaurants
+      .map((r) => {
+        const rLat = r.location?.latitude;
+        const rLng = r.location?.longitude;
+        if (!rLat || !rLng) return null;
+
+        const distance = getDistanceInKm(
+          userLatLng[0],
+          userLatLng[1],
+          rLat,
+          rLng
+        );
+
+        return { ...r, distance: parseFloat(distance) };
+      })
+      .filter((r) => r && r.distance <= searchRadius);
+
+    setFilteredRestaurants(filtered);
+  }, [searchRadius, userLatLng, allRestaurants]);
 
   // Handle address update form submit
   const handleProfileSubmit = async (e) => {
@@ -354,7 +353,7 @@ export default function UserPage() {
         ...prev,
         ...updatedFields,
       }));
-      setUserLatLng([lat, lng]); // ⬅️ this updates the map
+      setUserLatLng([lat, lng]); // this updates the map
       alert("Address updated successfully!");
     } catch (err) {
       setError("Failed to geocode address. Please try a different one.");
@@ -374,26 +373,16 @@ export default function UserPage() {
 
   if (!user) return <Navigate to="/login" />;
 
-  const restaurantsWithinRange = restaurants
-  .map((r) => {
-    const rLat = r.location?.latitude;
-    const rLng = r.location?.longitude;
+  const restaurantsWithinRange = filteredRestaurants;
 
-    if (!rLat || !rLng) return null;
-
-    const distance = getDistanceInKm(userLatLng[0], userLatLng[1], rLat, rLng);
-    return { ...r, distance: parseFloat(distance) };
-  })
-  .filter((r) => r && r.distance <= searchRadius);
-
-  const groupedByType = restaurantsWithinRange.reduce((acc, r) => {
+  const groupedFilteredByType = filteredRestaurants.reduce((acc, r) => {
     const type = r.type || "Other";
     if (!acc[type]) acc[type] = [];
     acc[type].push(r);
     return acc;
   }, {});
 
-  const sortedTypes = Object.keys(groupedByType).sort();
+  const filteredTypes = Object.keys(groupedFilteredByType).sort();
 
   return (
     <div className="p-6">
@@ -476,43 +465,39 @@ export default function UserPage() {
             <Popup>Your delivery location</Popup>
           </Marker>
 
-          {restaurantsWithinRange.map((r) => (
-            <Marker
-              key={r.id}
-              position={[r.location.latitude, r.location.longitude]}
-              icon={restaurantIcon}
-            >
-              <Popup>
-                <strong>{r.storeName}</strong>
-                <br />
-                {r.address}
-                <br />
-                {r.distance.toFixed(2)} km away
-              </Popup>
-            </Marker>
-          ))}
+          {allRestaurants.map((r) =>
+            r.location?.latitude && r.location?.longitude ? (
+              <Marker
+                key={r.id}
+                position={[r.location.latitude, r.location.longitude]}
+                icon={restaurantIcon}
+              >
+                <Popup>{r.name}</Popup>
+              </Marker>
+            ) : null
+          )}
         </MapContainer>
       </div>
       <h2 className="mt-8 text-xl">Nearby Open Restaurants within {searchRadius} km</h2>
       <div className="mt-4 space-y-6">
-        {sortedTypes.map((type) => (
-          <div key={type}>
-            <h3 className="text-lg font-semibold mb-2">{type}</h3>
-            <ul className="space-y-2">
-              {groupedByType[type].map((r) => {
-                const rLat = r.location?.latitude;
-                const rLng = r.location?.longitude;
-                const distance = (rLat && rLng)
-                  ? getDistanceInKm(userLatLng[0], userLatLng[1], rLat, rLng)
-                  : null;
-                const isExpanded = expandedRestaurantId === r.id;
+        {filteredTypes.map((type) => (
+        <div key={type}>
+          <h3 className="text-lg font-semibold mb-2">{type}</h3>
+          <ul className="space-y-2">
+            {groupedFilteredByType[type].map((r) => {
+              const rLat = r.location?.latitude;
+              const rLng = r.location?.longitude;
+              const distance = (rLat && rLng)
+                ? getDistanceInKm(userLatLng[0], userLatLng[1], rLat, rLng)
+                : null;
+              const isExpanded = expandedRestaurantId === r.id;
 
-                return (
-                  <li
-                    key={r.id}
-                    className="border p-2 rounded shadow cursor-pointer"
-                    onClick={() => setExpandedRestaurantId(isExpanded ? null : r.id)}
-                  >
+              return (
+                <li
+                  key={r.id}
+                  className="border p-2 rounded shadow cursor-pointer"
+                  onClick={() => setExpandedRestaurantId(isExpanded ? null : r.id)}
+                >
                     <h4 className="font-semibold">
                       {r.storeName}
                       {distance ? (
@@ -607,9 +592,8 @@ export default function UserPage() {
 
 /*
 *** add phone number
-*** if the opening and closing time is the same, the store is closed, not open
+*** On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
 * replace tailwind with regular css or get tailwind working
-* On user restaurant selection -> food item choice selection -> pay + order -> new restaurantOrders map (courier task shows up)
 
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
 Later: Special restaurant instructions (allergy)
@@ -617,17 +601,15 @@ Later: Special courier instructions (gated entry password...)
 Later: Show courier moving on map (car icon)
 Later: Do not allow orders on closed stores, do not show closed stores, do not retrieve closed stores
 Later: If a courier is not in range of the closing time of a restaurant (show the location, but do not allow orders)
-Later: To reduce search results (Fetch restaurants):
-    ~ 1. filter all by distance (max distance up to 100km)
-    ~ 2. filter by open hours
+Later: To reduce LIST search results (Fetch restaurants):
+    ~ 1. filter all by distance (max distance up to 100km) -> Done with toggling +/- ✅
+    ~ 2. filter by open hours -> possibly keep, but closed are ordered to lowest on list
     ~ 3. no places with the same name after 5 occurances
-    ~ 4. gather all result witin 100km from database on a single request, only show results based on map +/- distance to reduce database reads
 
 Maybe: Since anyone can create a restaurant, many can appear on the map. Preferential appearance based on totalOrders from unique userId. Advanced (restaurant): Paid preferential appearance option like Google Search.
 Maybe: Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
 Maybe: System updates from courier (waiting for restaurant, assistance button pressed)
 
-Advanced: decrease database read and writes by setting static restaurant range
 Advanced: Message system to admin team if excessive wait time
 Advanced: order from multiple restaurants in one order.
 
