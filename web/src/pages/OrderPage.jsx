@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, getAuth } from "firebase/auth";
-import { doc, getDoc, updateDoc, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, GeoPoint, Timestamp } from "firebase/firestore";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { auth, db } from "../firebase";
 
@@ -9,12 +9,24 @@ export default function OrderPage() {
   const navigate = useNavigate();
   const { restaurantId } = useParams();
   const restaurant = location.state?.restaurant;
-
   const [quantities, setQuantities] = useState({});
   const [total, setTotal] = useState(0);
   const [userId, setUserId] = useState(null);
   const [userData, setUserData] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+
+  function toGeoPoint(location) {
+    if (!location) return null;
+
+    // Works for _lat/_long or _latitude/_longitude fields
+    const lat = location._lat ?? location._latitude;
+    const long = location._long ?? location._longitude;
+
+    if (typeof lat === "number" && typeof long === "number") {
+      return new GeoPoint(lat, long);
+    }
+    return null;
+  }
 
   // SINGLE auth listener
   useEffect(() => {
@@ -99,7 +111,16 @@ export default function OrderPage() {
           prepTime: restaurant.menu[idx].prepTime || 0,
         }));
 
-      const totalPrepTime = items.reduce((sum, item) => sum + (item.prepTime || 0) * item.quantity, 0);
+      const totalPrepTime = items.reduce(
+        (sum, item) => sum + (item.prepTime || 0) * item.quantity,
+        0
+      );
+
+      const estimatedReadyDate = new Date();
+      estimatedReadyDate.setMinutes(estimatedReadyDate.getMinutes() + totalPrepTime);
+
+      console.log("restaurant.location", restaurant.location);
+      console.log("user.location", userData.deliveryLocation);
 
       const newOrder = {
         createdAt: Timestamp.now(),
@@ -109,12 +130,12 @@ export default function OrderPage() {
         userId,
         items,
         totalPrepTime,
+        estimatedReadyTime: Timestamp.fromDate(estimatedReadyDate),
 
-        // NEW FIELDS
         restaurantAddress: restaurant.address || "",
-        restaurantLocation: restaurant.location || null,
+        restaurantLocation: toGeoPoint(restaurant.location),
         userAddress: userData.address,
-        userLocation: userData.deliveryLocation,
+        userLocation: toGeoPoint(userData.deliveryLocation),
       };
 
       await updateDoc(restaurantOrdersRef, {

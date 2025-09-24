@@ -326,8 +326,9 @@ export default function CourierPage() {
 
 /*
 TODO
-*** 3. show restaurant orders on task list (after preparation time has elapsed)
-    4. if courier gps active and accepts (button); car icon appears on user's map
+*** 1. Button next to task
+*** 2. if courier gps active and accepts (button); car icon appears on user's map according to courier gps
+
 * add phone number
 * Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)
                  Job disclosure form: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
