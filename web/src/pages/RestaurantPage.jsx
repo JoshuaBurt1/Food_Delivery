@@ -575,24 +575,31 @@ export default function RestaurantPage() {
 
 
 /*
-* Delete profile field (top right nav user UI)
+*** 1. Restaurant must show orders (have a confirm & reject button) -> orderConfirmed: null; Status: awaiting restaurant confirmation
+       * confirm -> orderConfirmed = True -> deliveryStatus: "order confirmed, being prepared"
+       * reject -> orderConfirmed = False -> deliveryStatus: "order rejected" (this could then go to another restaurant...)
+       * timeout -> deliveryStatus: "order rejected" (this could then go to another restaurant...)
+*** The accepted orders go under heading "Orders awaiting pickup" 
+       * button "Pick-up completed" pressed -> deliveryStatus: "order being delivered" (hypothetical: on courier arrival, courierId match)
+                                            
 
-Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
-Later: Can view collection systemFiles, restaurantOrders for their restaurantId only (to make food)
-Later: Can view collection systemFiles, enrouteOrders for their restaurantId only (to confirm courierId on pick-up)
+* Later: Delete profile field (top right nav user UI)
+* Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
+* Maybe: field to upload logo that appears on map
+* Advanced: If restaurant does not accept the order -> refund user if not accepted
 
-Maybe: field to upload logo that appears on map
 
-Advanced: Restaurant has to accept the order for it to be processed -> refund user if not accepted
-Advanced: the reason orders are in systemFiles and not restaurant:
-1. the number of restaurantOrders, enrouteOrders, completedOrders could get very large -> large document
-2. restaurantOrders & enrouteOrders array are constantly added to / deleted keeping it a managable size
+# Design reasons 
+A. The reason orders are in systemFiles and not restaurant:
+1. the number of restaurantOrders & completedOrders could get very large -> large document
+2. restaurantOrders array are constantly added to / deleted keeping it a managable size
 3. completedOrders is the only "infinite" size document, rarely accessed. Can be ordered and searched quickly by createdAt date, courierId, restaurantId, userId.
-# these could be broken up further to reduce size (by date or restaurantId or restaurantId & date)
+* these could be broken up further to reduce size (by date or restaurantId or restaurantId & date)
+B. validity of address is "enforced" by the restaurant manager wanting sales. Advanced: further enforced by a courier message to admin if unable to access site.
 
 
-# validity of address is "enforced" by the restaurant manager wanting sales. Advanced: further enforced by a courier message to admin if unable to access site.
-# reused components:
+# Reused components:
 UserPage & RestaurantPage // ADDRESS to GEOLOCATION: OpenCage API -> async function geocodeAddress(address) { ...
+
 */
 

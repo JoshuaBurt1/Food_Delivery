@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, getAuth } from "firebase/auth";
-import { doc, getDoc, updateDoc, GeoPoint, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, GeoPoint, Timestamp, increment } from "firebase/firestore";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { auth, db } from "../firebase";
 
@@ -92,17 +92,22 @@ export default function OrderPage() {
     }
 
     try {
-      const restaurantOrdersRef = doc(db, "systemFiles", "restaurantOrders");
-      const docSnap = await getDoc(restaurantOrdersRef);
+      // Step 1: Get restaurant doc to read totalOrders
+      const restaurantRef = doc(db, "restaurants", restaurantId);
+      const restaurantSnap = await getDoc(restaurantRef);
 
-      if (!docSnap.exists()) {
-        alert("Order system not initialized.");
+      if (!restaurantSnap.exists()) {
+        alert("Restaurant not found.");
         return;
       }
 
-      const data = docSnap.data();
-      const existingOrders = data.restaurantOrders || [];
+      const restaurantData = restaurantSnap.data();
+      const currentTotalOrders = restaurantData.totalOrders || 0;
 
+      // Step 2: Generate orderId using current totalOrders
+      const orderId = `${restaurantId}_${currentTotalOrders}`;
+
+      // Step 3: Prepare order items
       const items = Object.entries(quantities)
         .filter(([idx, qty]) => qty > 0 && restaurant.menu[idx])
         .map(([idx, qty]) => ({
@@ -119,29 +124,38 @@ export default function OrderPage() {
       const estimatedReadyDate = new Date();
       estimatedReadyDate.setMinutes(estimatedReadyDate.getMinutes() + totalPrepTime);
 
-      console.log("restaurant.location", restaurant.location);
-      console.log("user.location", userData.deliveryLocation);
-
       const newOrder = {
         createdAt: Timestamp.now(),
-        deliveryStatus: "at restaurant",
-        orderId: `${restaurantId}_${existingOrders.length + 1}`,
+        deliveryStatus: "awaiting restaurant confirmation",
+        orderConfirmed: null,
+        courierId: "",
+        orderId,
         restaurantId,
         userId,
         items,
         totalPrepTime,
         estimatedReadyTime: Timestamp.fromDate(estimatedReadyDate),
-
         restaurantAddress: restaurant.address || "",
         restaurantLocation: toGeoPoint(restaurant.location),
         userAddress: userData.address,
         userLocation: toGeoPoint(userData.deliveryLocation),
       };
 
+      // Step 4: Save order to systemFiles > restaurantOrders
+      const restaurantOrdersRef = doc(db, "systemFiles", "restaurantOrders");
+      const ordersSnap = await getDoc(restaurantOrdersRef);
+      const existingOrders = ordersSnap.exists() ? (ordersSnap.data().restaurantOrders || []) : [];
+
       await updateDoc(restaurantOrdersRef, {
         restaurantOrders: [...existingOrders, newOrder],
       });
 
+      // Step 5: Increment totalOrders in the restaurant doc (safely)
+      await updateDoc(restaurantRef, {
+        totalOrders: increment(1),
+      });
+
+      // Step 6: Navigate after successful order
       navigate("/user", {
         state: {
           total,
@@ -149,6 +163,7 @@ export default function OrderPage() {
           items,
         },
       });
+
     } catch (error) {
       console.error("Error submitting order:", error);
       alert("There was an error processing your order. Please try again.");
@@ -221,13 +236,10 @@ export default function OrderPage() {
 }
 
 
-
 /*
-*** increment restaurants docId totalOrder by +1
-*** fix: orderId to something unique i.e. max order # (stored in restaurants, docId, totalOrders)
-* add payment -> create order -> split between: 
-~ Restaurant:	        Food revenue (minus platform commission)
-~ Delivery Driver:	    Delivery fee + tip (via platform)
-~ Platform (Delivery):	Commission + service fees
-* If the store is closed, orders cannot be placed
+* Later: add payment -> create order -> split between: 
+         ~ Restaurant:	        Food revenue (minus platform commission)
+         ~ Delivery Driver:	    Delivery fee + tip (via platform)
+         ~ Platform (Delivery):	Commission + service fees
+* Later: If the store is closed, orders cannot be placed
 */

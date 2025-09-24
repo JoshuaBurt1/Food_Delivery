@@ -80,7 +80,6 @@ function ZoomToRadius({ setSearchRadius, setMapInstance }) {
   return null;
 }
 
-
 function zoomLevelToKm(zoom) {
   // Leaflet zoom level to radius (km)
   const zoomToKm = {
@@ -223,6 +222,9 @@ export default function UserPage() {
   const [userLatLng, setUserLatLng] = useState([44.413922, -79.707506]); // Georgian Mall Family Dental as fallback
   const [allRestaurants, setAllRestaurants] = useState([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState([]);
+  const [userOrders, setUserOrders] = useState([]);
+
+
   const navigate = useNavigate();
 
 
@@ -336,6 +338,30 @@ export default function UserPage() {
     setFilteredRestaurants(filtered);
   }, [searchRadius, userLatLng, allRestaurants]);
 
+  useEffect(() => {
+    if (!userData?.id) return;
+    const fetchUserOrders = async () => {
+      try {
+        const orderDocRef = doc(db, "systemFiles", "restaurantOrders");
+        const orderSnap = await getDoc(orderDocRef);
+        if (orderSnap.exists()) {
+          const allOrders = orderSnap.data().restaurantOrders;
+          if (Array.isArray(allOrders)) {
+            const ordersForUser = allOrders.filter(
+              (order) => order.userId === userData.id
+            );
+            setUserOrders(ordersForUser);
+          } else {
+            console.warn("restaurantOrders field is not an array.");
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch user's orders:", err);
+      }
+    };
+    fetchUserOrders();
+  }, [userData]);
+
   // Handle phone and address update form submit
   const phoneRegex = /^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/;
   const handleProfileSubmit = async (e) => {
@@ -411,6 +437,39 @@ export default function UserPage() {
       <h1 className="text-2xl font-bold">
         Welcome, {user.displayName} (User)
       </h1>
+
+      <h2 className="text-xl font-bold mt-8 mb-4">Current Orders</h2>
+      {userOrders.length === 0 ? (
+        <p className="text-gray-600 italic">No current orders found.</p>
+      ) : (
+        <div className="space-y-4">
+          {userOrders.map((order, index) => (
+            <div
+              key={order.orderId || index}
+              className="border rounded p-4 bg-yellow-50 border-yellow-300 text-yellow-800 shadow-sm"
+            >
+              <h3 className="font-semibold text-lg mb-1">Order #{index + 1}</h3>
+              <p><strong>Status:</strong> {order.deliveryStatus}</p>
+              <p><strong>Restaurant:</strong> {order.restaurantAddress}</p>
+              <p><strong>Estimated Ready Time:</strong>{" "}
+                {order.estimatedReadyTime?.toDate().toLocaleString()}
+              </p>
+              <div className="mt-2">
+                <strong>Items:</strong>
+                <ul className="list-disc list-inside ml-4">
+                  {order.items?.map((item, idx) => (
+                    <li key={idx}>
+                      {item.name} (x{item.quantity})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      
+      <hr className="my-8 border-t-2 border-gray-300" />
       <form onSubmit={handleProfileSubmit}>
         <table className="w-full table-fixed border border-gray-300 mt-4">
           <thead className="bg-gray-100">
@@ -542,6 +601,7 @@ export default function UserPage() {
 
         </MapContainer>
       </div>
+    
       <h2 className="mt-8 text-xl">Nearby Restaurants within {searchRadius} km</h2>
       <div className="mt-4 space-y-6">
         {filteredTypes.map((type) => (
@@ -658,26 +718,27 @@ export default function UserPage() {
 
 
 /*
-* Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message; delete account)
-* replace tailwind with regular css or get tailwind working
+*** 2. Under current orders: Confirm deliveryStatus string showing restaurant rejects the order
+*** 6. if courier accepts offer; car icon appears on user's map according to courier gps
 
-Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise) or just use location services
-Later: Special restaurant instructions (allergy)
-Later: Special courier instructions (gated entry password...)
-Later: Show courier moving on map (car icon)
-Later: Do not allow orders on closed stores, do not show closed stores, do not retrieve closed stores
-Later: If a courier is not in range of the closing time of a restaurant (show the location, but do not allow orders)
-Later: To reduce LIST search results (Fetch restaurants):
+
+* Later: Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message; delete account)
+* Later: replace tailwind with regular css or get tailwind working
+* Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise) or just use location services
+* Later: Special restaurant instructions (allergy)
+* Later: Special courier instructions (gated entry password...)
+* Later: Show courier moving on map (car icon)
+* Later: Do not allow orders on closed stores, do not show closed stores, do not retrieve closed stores
+* Later: If a courier is not in range of the closing time of a restaurant (show the location, but do not allow orders)
+* Later: To reduce LIST search results (Fetch restaurants):
     ~ 1. filter all by distance (max distance up to 100km) -> Done with toggling +/- ✅
     ~ 2. filter by open hours -> possibly keep, but closed are ordered to lowest on list
     ~ 3. no places with the same name after 5 occurances
-
-Maybe: Since anyone can create a restaurant, many can appear on the map. Preferential appearance based on totalOrders from unique userId. Advanced (restaurant): Paid preferential appearance option like Google Search.
-Maybe: Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
-Maybe: System updates from courier (waiting for restaurant, assistance button pressed)
-
-Advanced: Message system to admin team if excessive wait time
-Advanced: order from multiple restaurants in one order.
+* Maybe: Since anyone can create a restaurant, many can appear on the map. Preferential appearance based on totalOrders from unique userId. Advanced (restaurant): Paid preferential appearance option like Google Search.
+* Maybe: Status updates from system (admin has contacted courier, admin has changed courier, estimated wait time)
+* Maybe: System updates from courier (waiting for restaurant, assistance button pressed)
+* Advanced: Message system to admin team if excessive wait time
+* Advanced: order from multiple restaurants in one order.
 
 
 # Assumes GPS is generally static, user can modify in input section

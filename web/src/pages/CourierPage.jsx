@@ -298,7 +298,9 @@ export default function CourierPage() {
           <p>No tasks available.</p>
         ) : (
           <ul className="list-disc list-inside text-gray-600">
-            {orders.map((order, idx) => (
+            {orders
+            .filter((order) => order.orderConfirmed === true)
+            .map((order, idx) => (
               <li key={idx} className="p-4 mb-4 border rounded bg-gray-50">
                 <strong>Order ID:</strong> {order.orderId} <br />
                 <strong>Status:</strong> {order.deliveryStatus} <br />
@@ -326,24 +328,26 @@ export default function CourierPage() {
 
 /*
 TODO
-*** 1. Add an "Accept" button next to all tasks
-*** 2. After accepting task moves under current task header, all other tasks and accept buttons disappear; courier's current task = orderId
-*** 3. if courier gps active and accepts (button); car icon appears on user's map according to courier gps
+*** 3. If orderConfirmed = True, it shows on task list
+*** 4. Add an "Accept" or "Reject" button next to 1 task 
+      -> If accept, courierId added to order form courierId field
+      -> If reject, a new task is offered under Task List  (to limit preferential choices)
+*** 5. After accepting task moves under current task header, courier's current task = orderId (gps must be active)
+*** 7. Courier presses "Picked up" button when within a close gps radius -> deliveryStatus: "order being delivered" (if restaurant doesn't)
+*** 8. Courier presses "Delivered" button when within a close gps radius -> deliveryStatus: "completed"
+*** 9. Order copied to collection: systemFiles/completedOrders -> order deleted from systemFiles/restaurantOrders 
+*** 10. Earnings increase     
 
-* add phone number
-* Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)
-                 Job disclosure form: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
-                 obligation to select movementFlag updates if waiting; add phoneNumber field
 
-* inactivityTimer: initially set to 0; increases if gps value does not change by a significant amount
-* movementFlag: initially set to inactive; set to inactive if inactivityTimer > threshold (10min)
-* courier must be within a certain distance to accept a task
-* to start a task the courier must press an accept task button -> an enrouteOrder is created in systemFiles
-* courier must select deliveryStatus option area when 1. they pick up food from restaurant "in transit" and 2. deliver it to the customer "completed"
-                                                      1. restaurantOrder deleted               2. enrouteOrder deleted & completedOrder created + earnings increase
-* deliveryStatus: food location is either: 0. "at restaurant" (initial setting), 1. "in transit", or 2. "completed";
-                updates systemFiles field delivery status -> enrouteOrders or completedOrders depending on status
-* advanced: couriers with multiple tasks are possible [2 people in same area, around same time, order from the same McDonalds]; task gen function in systemFiles restaurant orders
+* Later: add phone number
+* Later: Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)
+                      Job disclosure form: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
+                      obligation to select movementFlag updates if waiting; add phoneNumber field
+* Later: inactivityTimer: initially set to 0; increases if gps value does not change by a significant amount
+* Later: movementFlag: initially set to inactive; set to inactive if inactivityTimer > threshold (10min)
+* Later: courier must be within a certain distance to accept a task
+* Advanced: couriers with multiple tasks are possible [2 people in same area, around same time, order from the same McDonalds]; task gen function in systemFiles restaurant orders
+
 
 courierId: used by admin to identify the courier on a job task                                                    (essential for job)
 currentTask: used by admin to identify if the courier has a task <orderId>                                          [filled / empty]
@@ -356,6 +360,22 @@ movementFlag: active (moving), inactive (10 min), waiting for restaurant, waitin
 name: necessary for admin to contact you
 phoneNum: necessary for admin to contact you
 status: used by admin to identify if the courier has a gps connection                                               [active / T]
+
+
+# Order sequence:
+1. User makes order (OrderPage); orderConfirmed: null; Status: awaiting restaurant confirmation
+2. Restaurant confirms, rejects, or a timeout occurs (RestaurantPage)
+   If accepted -> orderConfirmed = True -> deliveryStatus: "order confirmed, being prepared"
+      rejected -> orderConfirmed = False -> deliveryStatus: "order rejected" (this could then go to another restaurant...)
+      timeout -> orderConfirmed = False -> deliveryStatus: "order rejected" (this could then go to another restaurant...)
+3. Task shows on CourierPage (if orderConfirmed = True)
+   If accept -> courierId value added to order courierId field (to hypothetically match @ restaurant/courier meeting point)
+                deliveryStatus = "delivery in progress"
+                car icon @ gps of courier shows on UserPage
+   If reject -> a new task is offered under Task List (to limit preferential choices)
+4. On arrival to the user; courier selects button "delivered" -> deliveryStatus = "completed"
+   order copied to collection: systemFiles/completedOrders -> order deleted from systemFiles/restaurantOrders
+
 
 Cases: 
 1. status = inactive &                                  currentTask = empty  -> currentTasks are unavailable to be added
