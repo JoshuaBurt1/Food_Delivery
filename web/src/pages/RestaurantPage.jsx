@@ -66,6 +66,7 @@ export default function RestaurantPage() {
     description: "",
     calories: "",
     price: "",
+    prepTime: "",
     imgUrl: "",
     available: true,
   });
@@ -88,6 +89,7 @@ export default function RestaurantPage() {
             ...item,
             calories: parseInt(item.calories),
             price: parseFloat(item.price),
+            prepTime: parseInt(item.prepTime),
           }
         : item
     );
@@ -373,6 +375,7 @@ export default function RestaurantPage() {
             ...newMenuItem,
             calories: parseInt(newMenuItem.calories),
             price: parseFloat(newMenuItem.price),
+            prepTime: parseInt(newMenuItem.prepTime),
           };
 
           const updatedMenu = [...(restaurantData.menu || []), itemToAdd];
@@ -386,6 +389,7 @@ export default function RestaurantPage() {
                 description: "",
                 calories: "",
                 price: "",
+                prepTime: "",
                 imgUrl: "",
                 available: true,
               });
@@ -436,6 +440,16 @@ export default function RestaurantPage() {
           onChange={(e) => setNewMenuItem({ ...newMenuItem, price: e.target.value })}
           className="w-full border px-3 py-2 rounded"
           required
+        />
+
+        <input
+          type="number"
+          placeholder="Prep Time (minutes)"
+          value={newMenuItem.prepTime}
+          onChange={(e) =>
+            setNewMenuItem({ ...newMenuItem, prepTime: e.target.value })
+          }
+          className="w-full border px-3 py-2 rounded"
         />
 
         <input
@@ -511,6 +525,13 @@ export default function RestaurantPage() {
                       className="text-sm w-full border px-2 py-1 rounded"
                     />
                     <input
+                      type="number"
+                      value={item.prepTime}
+                      onChange={(e) => handleMenuChange(index, "prepTime", e.target.value)}
+                      placeholder="Prep Time (minutes)"
+                      className="text-sm w-full border px-2 py-1 rounded"
+                    />
+                    <input
                       type="text"
                       value={item.imgUrl}
                       onChange={(e) => handleMenuChange(index, "imgUrl", e.target.value)}
@@ -554,8 +575,6 @@ export default function RestaurantPage() {
 
 
 /*
-*** 1. each food item should have a prepTime time field, which is then passed to a new restaurantOrder. 
-    When that time elapses the task should show on the courier task list
 * Delete profile field (top right nav user UI)
 
 Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
@@ -569,7 +588,7 @@ Advanced: the reason orders are in systemFiles and not restaurant:
 1. the number of restaurantOrders, enrouteOrders, completedOrders could get very large -> large document
 2. restaurantOrders & enrouteOrders array are constantly added to / deleted keeping it a managable size
 3. completedOrders is the only "infinite" size document, rarely accessed. Can be ordered and searched quickly by createdAt date, courierId, restaurantId, userId.
-# these could be broken up further to reduce size (one restaurantOrders/enrouteOrders/completedOrders per restuarant); collection within a document
+# these could be broken up further to reduce size (by date or restaurantId or restaurantId & date)
 
 
 # validity of address is "enforced" by the restaurant manager wanting sales. Advanced: further enforced by a courier message to admin if unable to access site.

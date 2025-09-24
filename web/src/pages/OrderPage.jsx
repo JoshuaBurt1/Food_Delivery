@@ -74,6 +74,11 @@ export default function OrderPage() {
       return;
     }
 
+    if (!userData?.deliveryLocation || !userData?.address) {
+      alert("Missing user location or address.");
+      return;
+    }
+
     try {
       const restaurantOrdersRef = doc(db, "systemFiles", "restaurantOrders");
       const docSnap = await getDoc(restaurantOrdersRef);
@@ -91,22 +96,32 @@ export default function OrderPage() {
         .map(([idx, qty]) => ({
           name: restaurant.menu[idx].name,
           quantity: qty,
+          prepTime: restaurant.menu[idx].prepTime || 0,
         }));
+
+      const totalPrepTime = items.reduce((sum, item) => sum + (item.prepTime || 0) * item.quantity, 0);
 
       const newOrder = {
         createdAt: Timestamp.now(),
         deliveryStatus: "at restaurant",
-        items,
         orderId: `${restaurantId}_${existingOrders.length + 1}`,
         restaurantId,
         userId,
+        items,
+        totalPrepTime,
+
+        // NEW FIELDS
+        restaurantAddress: restaurant.address || "",
+        restaurantLocation: restaurant.location || null,
+        userAddress: userData.address,
+        userLocation: userData.deliveryLocation,
       };
 
       await updateDoc(restaurantOrdersRef, {
         restaurantOrders: [...existingOrders, newOrder],
       });
 
-      navigate("/payment", {
+      navigate("/user", {
         state: {
           total,
           restaurantName: restaurant.storeName,
@@ -185,9 +200,8 @@ export default function OrderPage() {
 
 
 /*
-*** 2. pass the prepTime field to the new restaurantOrder
-* fix: orderNumber
-* payment split between: 
+** fix: orderNumber
+** add payment -> create order -> split between: 
 ~ Restaurant:	        Food revenue (minus platform commission)
 ~ Delivery Driver:	    Delivery fee + tip (via platform)
 ~ Platform (Delivery):	Commission + service fees

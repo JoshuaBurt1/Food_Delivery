@@ -5,6 +5,7 @@ import { auth, db } from "../firebase";
 import {
   collection,
   getDocs,
+  getDoc,
   addDoc,
   GeoPoint,
   updateDoc,
@@ -18,9 +19,12 @@ export default function CourierPage() {
   const [fetchingCourier, setFetchingCourier] = useState(true);
   const [error, setError] = useState("");
   const [locationAccessDenied, setLocationAccessDenied] = useState(false);
+  const [orders, setOrders] = useState([]);
+  const [fetchingOrders, setFetchingOrders] = useState(true);
   const locationQueue = useRef(null);
   const throttleTimeout = useRef(null);
   const courierDataRef = useRef(courierData);
+
   useEffect(() => {
     courierDataRef.current = courierData;
   }, [courierData]);
@@ -218,60 +222,107 @@ export default function CourierPage() {
     };
   }, [courierData?.id, locationAccessDenied]);
 
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const ordersDocRef = doc(db, "systemFiles", "restaurantOrders");
+        const ordersSnap = await getDoc(ordersDocRef);
+        if (ordersSnap.exists()) {
+          const data = ordersSnap.data();
+          const allOrders = data.restaurantOrders || [];
+          setOrders(allOrders);
+        } else {
+          console.warn("restaurantOrders doc does not exist");
+          setOrders([]);
+        }
+      } catch (err) {
+        console.error("Error fetching orders:", err);
+      } finally {
+        setFetchingOrders(false);
+      }
+    };
+
+    fetchOrders();
+  }, []);
+
   if (loadingAuth) return <div>Loading authentication...</div>;
   if (!user) return <Navigate to="/login" />;
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold">
-        Welcome, {user.displayName || user.email} (Courier)
-      </h1>
+  <div className="p-6">
+    <h1 className="text-2xl font-bold">
+      Welcome, {user.displayName || user.email} (Courier)
+    </h1>
 
-      {error && <p className="mt-4 text-red-600">{error}</p>}
+    {error && <p className="mt-4 text-red-600">{error}</p>}
 
-      {fetchingCourier ? (
-        <p className="mt-4">Checking your courier profile...</p>
-      ) : courierData ? (
-        <>
-          <table className="mt-6 w-full text-left border border-gray-300">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="p-2 border">Courier ID</th>
-                <th className="p-2 border">Name</th>
-                <th className="p-2 border">Email</th>
-                <th className="p-2 border">Earnings</th>
-                <th className="p-2 border">Location</th>
-                <th className="p-2 border">Movement Status</th> 
-                <th className="p-2 border">GPS Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="p-2 border">{courierData.courierId}</td>
-                <td className="p-2 border">{courierData.name}</td>
-                <td className="p-2 border">{courierData.email}</td>
-                <td className="p-2 border">${courierData.earnings.toFixed(2)}</td>
-                <td className="p-2 border">
-                  {courierData.location?.latitude.toFixed(8)},{" "}
-                  {courierData.location?.longitude.toFixed(8)}
-                </td>
-                <td className="p-2 border">{courierData.movementFlag}</td>
-                <td className="p-2 border">{courierData.status}</td>
-              </tr>
-            </tbody>
-          </table>
-          <hr className="my-8 border-t-2 border-gray-300" />
+    {fetchingCourier ? (
+      <p className="mt-4">Checking your courier profile...</p>
+    ) : courierData ? (
+      <>
+        <table className="mt-6 w-full text-left border border-gray-300">
+          <thead className="bg-gray-100">
+            <tr>
+              <th className="p-2 border">Courier ID</th>
+              <th className="p-2 border">Name</th>
+              <th className="p-2 border">Email</th>
+              <th className="p-2 border">Earnings</th>
+              <th className="p-2 border">Location</th>
+              <th className="p-2 border">Movement Status</th>
+              <th className="p-2 border">GPS Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="p-2 border">{courierData.courierId}</td>
+              <td className="p-2 border">{courierData.name}</td>
+              <td className="p-2 border">{courierData.email}</td>
+              <td className="p-2 border">${courierData.earnings.toFixed(2)}</td>
+              <td className="p-2 border">
+                {courierData.location?.latitude.toFixed(8)},{" "}
+                {courierData.location?.longitude.toFixed(8)}
+              </td>
+              <td className="p-2 border">{courierData.movementFlag}</td>
+              <td className="p-2 border">{courierData.status}</td>
+            </tr>
+          </tbody>
+        </table>
 
-          <h2 className="text-xl font-semibold mb-4">📝 Task List</h2>
+        <hr className="my-8 border-t-2 border-gray-300" />
 
+        <h2 className="text-xl font-semibold mb-4">📝 Task List</h2>
+
+        {fetchingOrders ? (
+          <p>Loading tasks…</p>
+        ) : orders.length === 0 ? (
+          <p>No tasks available.</p>
+        ) : (
           <ul className="list-disc list-inside text-gray-600">
-            <li className="italic text-gray-400">No tasks selectable yet.</li>
+            {orders.map((order, idx) => (
+              <li key={idx} className="p-4 mb-4 border rounded bg-gray-50">
+                <strong>Order ID:</strong> {order.orderId} <br />
+                <strong>Status:</strong> {order.deliveryStatus} <br />
+                <strong>Items:</strong>
+                <ul className="ml-4 list-disc">
+                  {order.items.map((item, i) => (
+                    <li key={i}>
+                      {item.name} × {item.quantity} (prep: {item.prepTime} min)
+                    </li>
+                  ))}
+                </ul>
+                <strong>Total Prep Time:</strong> {order.totalPrepTime} min <br />
+                <strong>Restaurant Address:</strong> {order.restaurantAddress} <br />
+                <strong>User Address:</strong> {order.userAddress}
+              </li>
+            ))}
           </ul>
-        </>
-      ) : null}
-    </div>
-  );
+        )}
+      </>
+    ) : null}
+  </div>
+);
 }
+
 
 /*
 TODO
