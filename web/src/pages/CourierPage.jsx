@@ -326,8 +326,9 @@ export default function CourierPage() {
 
 /*
 TODO
-*** 1. Button next to task
-*** 2. if courier gps active and accepts (button); car icon appears on user's map according to courier gps
+*** 1. Add an "Accept" button next to all tasks
+*** 2. After accepting task moves under current task header, all other tasks and accept buttons disappear; courier's current task = orderId
+*** 3. if courier gps active and accepts (button); car icon appears on user's map according to courier gps
 
 * add phone number
 * Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)

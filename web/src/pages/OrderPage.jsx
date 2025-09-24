@@ -223,8 +223,9 @@ export default function OrderPage() {
 
 
 /*
-** fix: orderNumber
-** add payment -> create order -> split between: 
+*** increment restaurants docId totalOrder by +1
+*** fix: orderId to something unique i.e. max order # (stored in restaurants, docId, totalOrders)
+* add payment -> create order -> split between: 
 ~ Restaurant:	        Food revenue (minus platform commission)
 ~ Delivery Driver:	    Delivery fee + tip (via platform)
 ~ Platform (Delivery):	Commission + service fees
