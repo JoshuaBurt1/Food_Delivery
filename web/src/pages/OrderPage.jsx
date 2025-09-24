@@ -159,15 +159,13 @@ export default function OrderPage() {
   if (!authChecked || !restaurant) return <div>Loading...</div>;
   if (!userId) return null;
 
-  const availableMenu = restaurant.menu?.filter(item => item.available) || [];
-
   return (
     <div className="p-6 max-w-4xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">
         Order from {restaurant.storeName}
       </h1>
 
-      {availableMenu.length === 0 ? (
+      {!restaurant.menu?.some(item => item.available) ? (
         <p>No menu items available.</p>
       ) : (
         <form onSubmit={(e) => {
@@ -175,32 +173,36 @@ export default function OrderPage() {
           handleSubmitOrder();
         }}>
           <ul className="space-y-4">
-            {availableMenu.map((item, index) => (
-              <li key={index} className="border rounded p-4 flex gap-4 items-start shadow-sm">
-                {item.imgUrl && (
-                  <img
-                    src={item.imgUrl}
-                    alt={item.name}
-                    style={{ width: "100px", height: "100px", objectFit: "cover" }}
-                    className="rounded"
-                  />
-                )}
-                <div className="flex-1">
-                  <h3 className="font-semibold">{item.name}</h3>
-                  <p className="text-sm text-gray-600">{item.description}</p>
-                  <p className="text-sm text-gray-500">Calories: {item.calories}</p>
-                  <p className="text-sm font-medium mb-2">${item.price.toFixed(2)}</p>
-                  <input
-                    type="number"
-                    min="0"
-                    className="w-24 border px-2 py-1 rounded"
-                    value={quantities[index] || ""}
-                    onChange={(e) => handleQuantityChange(index, e.target.value)}
-                    placeholder="Qty"
-                  />
-                </div>
-              </li>
-            ))}
+            {restaurant.menu.map((item, index) => {
+              if (!item.available) return null;
+
+              return (
+                <li key={index} className="border rounded p-4 flex gap-4 items-start shadow-sm">
+                  {item.imgUrl && (
+                    <img
+                      src={item.imgUrl}
+                      alt={item.name}
+                      style={{ width: "100px", height: "100px", objectFit: "cover" }}
+                      className="rounded"
+                    />
+                  )}
+                  <div className="flex-1">
+                    <h3 className="font-semibold">{item.name}</h3>
+                    <p className="text-sm text-gray-600">{item.description}</p>
+                    <p className="text-sm text-gray-500">Calories: {item.calories}</p>
+                    <p className="text-sm font-medium mb-2">${item.price.toFixed(2)}</p>
+                    <input
+                      type="number"
+                      min="0"
+                      className="w-24 border px-2 py-1 rounded"
+                      value={quantities[index] || ""}
+                      onChange={(e) => handleQuantityChange(index, e.target.value)}
+                      placeholder="Qty"
+                    />
+                  </div>
+                </li>
+              );
+            })}
           </ul>
 
           <div className="mt-6 text-right">
