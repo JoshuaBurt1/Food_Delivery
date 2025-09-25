@@ -223,26 +223,39 @@ export default function CourierPage() {
   }, [courierData?.id, locationAccessDenied]);
 
   useEffect(() => {
-    const fetchOrders = async () => {
+    const fetchAllOrders = async () => {
       try {
-        const ordersDocRef = doc(db, "systemFiles", "restaurantOrders");
-        const ordersSnap = await getDoc(ordersDocRef);
-        if (ordersSnap.exists()) {
-          const data = ordersSnap.data();
-          const allOrders = data.restaurantOrders || [];
-          setOrders(allOrders);
-        } else {
-          console.warn("restaurantOrders doc does not exist");
-          setOrders([]);
+        const restaurantsRef = collection(db, "restaurants");
+        const restaurantsSnapshot = await getDocs(restaurantsRef);
+
+        let allOrders = [];
+
+        // For each restaurant, get its orders
+        for (const restaurantDoc of restaurantsSnapshot.docs) {
+          const restaurantId = restaurantDoc.id;
+          const ordersRef = collection(db, "restaurants", restaurantId, "restaurantOrders");
+          const ordersSnapshot = await getDocs(ordersRef);
+
+          // For each order in this restaurantOrders subcollection
+          ordersSnapshot.forEach((orderDoc) => {
+            const orderData = orderDoc.data();
+            // Filter only confirmed orders
+            if (orderData.orderConfirmed === true) {
+              allOrders.push(orderData);
+            }
+          });
         }
+
+        setOrders(allOrders);
       } catch (err) {
         console.error("Error fetching orders:", err);
+        setError("Failed to fetch orders.");
       } finally {
         setFetchingOrders(false);
       }
     };
 
-    fetchOrders();
+    fetchAllOrders();
   }, []);
 
   if (loadingAuth) return <div>Loading authentication...</div>;

@@ -340,26 +340,14 @@ export default function UserPage() {
 
   useEffect(() => {
     if (!userData?.id) return;
-    const fetchUserOrders = async () => {
-      try {
-        const orderDocRef = doc(db, "systemFiles", "restaurantOrders");
-        const orderSnap = await getDoc(orderDocRef);
-        if (orderSnap.exists()) {
-          const allOrders = orderSnap.data().restaurantOrders;
-          if (Array.isArray(allOrders)) {
-            const ordersForUser = allOrders.filter(
-              (order) => order.userId === userData.id
-            );
-            setUserOrders(ordersForUser);
-          } else {
-            console.warn("restaurantOrders field is not an array.");
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch user's orders:", err);
-      }
-    };
-    fetchUserOrders();
+
+    fetchUserOrders(); // initial fetch
+
+    const interval = setInterval(() => {
+      fetchUserOrders();
+    }, 30000); // every 30 seconds
+
+    return () => clearInterval(interval); // cleanup on unmount
   }, [userData]);
 
   // Handle phone and address update form submit
@@ -432,7 +420,38 @@ export default function UserPage() {
 
   const filteredTypes = Object.keys(groupedFilteredByType).sort();
 
-    return (
+  //ORDER STATUS updates
+  const fetchUserOrders = async () => {
+    if (!userData?.id) return;
+    try {
+      const ordersForUser = [];
+      // Loop through all restaurants
+      for (const restaurant of allRestaurants) {
+        const restaurantId = restaurant.id;
+        const ordersRef = collection(db, "restaurants", restaurantId, "restaurantOrders");
+
+        const ordersSnap = await getDocs(ordersRef);
+        ordersSnap.forEach((docSnap) => {
+          const orderData = docSnap.data();
+          if (orderData.userId === userData.id) {
+            ordersForUser.push({ ...orderData, orderId: docSnap.id });
+          }
+        });
+      }
+      setUserOrders((prevOrders) => {
+        const prevString = JSON.stringify(prevOrders);
+        const newString = JSON.stringify(ordersForUser);
+        if (prevString !== newString) {
+          return ordersForUser;
+        }
+        return prevOrders;
+      });
+    } catch (err) {
+      console.error("Failed to fetch user orders from restaurant subcollections:", err);
+    }
+  };
+
+  return (
     <div className="p-6">
       <h1 className="text-2xl font-bold">
         Welcome, {user.displayName} (User)
@@ -714,7 +733,6 @@ export default function UserPage() {
     </div>
   );
 }
-
 
 
 /*

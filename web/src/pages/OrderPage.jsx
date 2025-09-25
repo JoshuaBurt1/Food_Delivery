@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { onAuthStateChanged, getAuth } from "firebase/auth";
-import { doc, getDoc, updateDoc, GeoPoint, Timestamp, increment } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, GeoPoint, Timestamp, increment } from "firebase/firestore";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { auth, db } from "../firebase";
 
@@ -104,7 +104,7 @@ export default function OrderPage() {
       const restaurantData = restaurantSnap.data();
       const currentTotalOrders = restaurantData.totalOrders || 0;
 
-      // Step 2: Generate orderId using current totalOrders
+      // Step 2: Generate unique orderId
       const orderId = `${restaurantId}_${currentTotalOrders}`;
 
       // Step 3: Prepare order items
@@ -124,9 +124,10 @@ export default function OrderPage() {
       const estimatedReadyDate = new Date();
       estimatedReadyDate.setMinutes(estimatedReadyDate.getMinutes() + totalPrepTime);
 
+      // Step 4: Construct the order document
       const newOrder = {
         createdAt: Timestamp.now(),
-        deliveryStatus: "awaiting restaurant confirmation",
+        deliveryStatus: "Awaiting restaurant confirmation.",
         orderConfirmed: null,
         courierId: "",
         orderId,
@@ -141,21 +142,16 @@ export default function OrderPage() {
         userLocation: toGeoPoint(userData.deliveryLocation),
       };
 
-      // Step 4: Save order to systemFiles > restaurantOrders
-      const restaurantOrdersRef = doc(db, "systemFiles", "restaurantOrders");
-      const ordersSnap = await getDoc(restaurantOrdersRef);
-      const existingOrders = ordersSnap.exists() ? (ordersSnap.data().restaurantOrders || []) : [];
+      // Step 5: Save to /restaurants/{restaurantId}/restaurantOrders/{orderId}
+      const orderRef = doc(db, "restaurants", restaurantId, "restaurantOrders", orderId);
+      await setDoc(orderRef, newOrder);
 
-      await updateDoc(restaurantOrdersRef, {
-        restaurantOrders: [...existingOrders, newOrder],
-      });
-
-      // Step 5: Increment totalOrders in the restaurant doc (safely)
+      // Step 6: Increment totalOrders on the restaurant doc
       await updateDoc(restaurantRef, {
         totalOrders: increment(1),
-      });
+      });      
 
-      // Step 6: Navigate after successful order
+      // Step 7: Navigate after successful order
       navigate("/user", {
         state: {
           total,
