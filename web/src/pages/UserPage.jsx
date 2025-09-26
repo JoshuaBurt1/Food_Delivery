@@ -224,10 +224,9 @@ export default function UserPage() {
   const [allRestaurants, setAllRestaurants] = useState([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState([]);
   const [userOrders, setUserOrders] = useState([]);
-
+  const [userMessages, setUserMessages] = useState([]);
 
   const navigate = useNavigate();
-
 
   // Auth listener
   useEffect(() => {
@@ -371,8 +370,6 @@ export default function UserPage() {
         ];
 
         // Set only once all restaurants have been processed at least once
-        //setUserOrders([...collectedOrders].sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate()));
-      //});
         setUserOrders([...collectedOrders]);
       });
 
@@ -383,6 +380,31 @@ export default function UserPage() {
       unsubscribers.forEach((unsub) => unsub());
     };
   }, [userData?.id, allRestaurants]);
+
+  // --- MESSAGE LISTENER FOR USER ---
+  useEffect(() => {
+    if (!userData?.id) return;
+    const messagesRef = collection(db, "users", userData.id, "messages");
+
+    // Setup real-time listener for messages
+    const unsub = onSnapshot(messagesRef, (snapshot) => {
+      const fetchedMessages = snapshot.docs.map((docSnap) => ({
+        messageId: docSnap.id,
+        ...docSnap.data(),
+      }));
+      // Sort by createdAt time descending (newest first)
+      fetchedMessages.sort((a, b) => {
+        const timeA = a.createdAt?.toMillis?.() || 0;
+        const timeB = b.createdAt?.toMillis?.() || 0;
+        return timeB - timeA; // B minus A for descending (newest first)
+      });
+      setUserMessages(fetchedMessages);
+    }, (error) => {
+      console.error("Error listening to user messages:", error);
+    // Handle error fetching messages (optional)
+    });
+    return () => unsub();
+  }, [userData?.id]);
 
 
   // Handle phone and address update form submit
@@ -461,36 +483,41 @@ export default function UserPage() {
         Welcome, {user.displayName} (User)
       </h1>
 
-      <h2 className="text-xl font-bold mt-8 mb-4">Current Orders</h2>
-      {userOrders.length === 0 ? (
+      {userOrders.filter(order => order.orderConfirmed !== false).length === 0 ? (
         <p className="text-gray-600 italic">No current orders found.</p>
       ) : (
         <div className="space-y-4">
-          {userOrders.map((order, index) => (
-            <div
-              key={order.orderId || index}
-              className="border rounded p-4 bg-yellow-50 border-yellow-300 text-yellow-800 shadow-sm"
-            >
-              <h3 className="font-semibold text-lg mb-1">Order #{index + 1}</h3>
-              <p><strong>Status:</strong> {order.deliveryStatus}</p>
-              <p><strong>Restaurant:</strong> {order.restaurantAddress}</p>
-              <p><strong>Estimated Ready Time:</strong>{" "}
-                {order.estimatedReadyTime?.toDate().toLocaleString()}
-              </p>
-              <div className="mt-2">
-                <strong>Items:</strong>
-                <ul className="list-disc list-inside ml-4">
-                  {order.items?.map((item, idx) => (
-                    <li key={idx}>
-                      {item.name} (x{item.quantity})
-                    </li>
-                  ))}
-                </ul>
+          {userOrders
+            .filter(order => order.orderConfirmed !== false)
+            .map((order, index) => (
+              <div
+                key={order.orderId || index}
+                className="border rounded p-4 bg-yellow-50 border-yellow-300 text-yellow-800 shadow-sm"
+              >
+                <h3 className="font-semibold text-lg mb-1">
+                  Order #{index + 1}
+                </h3>
+                <p><strong>Status:</strong> {order.deliveryStatus}</p>
+                <p><strong>Restaurant:</strong> {order.restaurantAddress}</p>
+                <p>
+                  <strong>Estimated Ready Time:</strong>{" "}
+                  {order.estimatedReadyTime?.toDate().toLocaleString()}
+                </p>
+                <div className="mt-2">
+                  <strong>Items:</strong>
+                  <ul className="list-disc list-inside ml-4">
+                    {order.items?.map((item, idx) => (
+                      <li key={idx}>
+                        {item.name} (x{item.quantity})
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
         </div>
       )}
+
       
       <hr className="my-8 border-t-2 border-gray-300" />
       <form onSubmit={handleProfileSubmit}>
@@ -734,6 +761,37 @@ export default function UserPage() {
           </div>
         ))}
       </div>
+      <hr className="my-8 border-t-2 border-gray-300" />
+      <h2 className="text-xl font-bold mt-8 mb-4">Messages</h2>
+      {(!userMessages || userMessages.length === 0) ? (
+        <p className="text-gray-600 italic">No new messages.</p>
+      ) : (
+        <ul className="space-y-4 list-none p-0">
+          {userMessages.map((msg) => (
+            <li
+              key={msg.messageId}
+              className={`border rounded p-4 shadow-sm ${
+                msg.read === false ? "bg-blue-50 border-blue-300" : "bg-white border-gray-200"
+              }`}
+            >
+              <div className="flex justify-between items-start mb-1">
+                <p className="font-semibold text-lg">{msg.message}</p>
+                <span className="text-xs text-gray-500 ml-4 whitespace-nowrap">
+                  {msg.createdAt?.toDate().toLocaleString()}
+                </span>
+              </div>
+              {msg.read === false && (
+                <span className="inline-block text-xs font-medium text-blue-600">NEW</span>
+              )}
+              {msg.orderId && (
+                <p className="text-sm text-gray-600 mt-1">Related to Order ID: {msg.orderId}</p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+
     </div>
   );
 }

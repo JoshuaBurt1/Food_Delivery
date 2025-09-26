@@ -190,7 +190,7 @@ export default function RestaurantPage() {
             
             await addDoc(messagesRef, {
                 createdAt: serverTimestamp(), 
-                message: "Order could not be fulfilled, refund sent.",
+                message: "Order timed out and could not be fulfilled, refund sent.",
                 read: false, 
                 type: "order_status",
                 orderId: orderId,
@@ -398,7 +398,7 @@ export default function RestaurantPage() {
             
             await addDoc(messagesRef, {
                 createdAt: serverTimestamp(), // Use Firestore serverTimestamp
-                message: "Order could not be fulfilled, refund sent.",
+                message: "Rejected by restaurant. Order could not be fulfilled, refund sent.",
                 read: false, 
                 type: "order_status",
                 orderId: orderId,
