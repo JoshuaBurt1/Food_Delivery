@@ -156,6 +156,7 @@ export default function OrderPage() {
       // Step 4: Construct the order document
       const newOrder = {
         createdAt: createdAt,
+        courierArray: [],
         orderTimeout: orderTimeout,
         deliveryStatus: "Awaiting restaurant confirmation.",
         orderConfirmed: null,

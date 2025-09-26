@@ -36,6 +36,21 @@ async function geocodeAddress(address) {
   }
 }
 
+// DISTANCE of restaurant from couriers
+function getDistanceInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371; // Radius of the Earth in km
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return parseFloat((R * c).toFixed(2)); // distance in km
+}
+
 function parseHoursArray(hoursArray) {
   const result = {};
   hoursArray.forEach((dayObj) => {
@@ -322,7 +337,7 @@ export default function RestaurantPage() {
     return () => clearInterval(interval);
   }, [restaurantData?.id, orders]);
 
-  // Confirm / Reject handlers
+  
   const handleConfirmOrder = async (orderId) => {
     try {
       const orderDocRef = doc(
@@ -333,9 +348,34 @@ export default function RestaurantPage() {
         orderId
       );
 
+      // Get restaurant’s location
+      const restLat = restaurantData.location.latitude;
+      const restLng = restaurantData.location.longitude;
+
+      // Fetch all couriers (or better, a filtered subset)
+      const couriersCol = collection(db, "couriers");
+      const couriersSnap = await getDocs(couriersCol);
+
+      const courierArray = [];
+
+      couriersSnap.forEach((courierDoc) => {
+        const cData = courierDoc.data();
+        if (cData.location && typeof cData.location.latitude === "number") {
+          const cLat = cData.location.latitude;
+          const cLng = cData.location.longitude;
+
+          const distKm = getDistanceInKm(restLat, restLng, cLat, cLng);
+          if (distKm <= 50) {
+            courierArray.push(courierDoc.id);
+          }
+        }
+      });
+
+      // Now update the order including courierArray
       await updateDoc(orderDocRef, {
         orderConfirmed: true,
         deliveryStatus: "Confirmed, order being prepared.",
+        courierArray: courierArray,
       });
 
       // Update local state
@@ -346,6 +386,7 @@ export default function RestaurantPage() {
                 ...o,
                 orderConfirmed: true,
                 deliveryStatus: "Confirmed, order being prepared.",
+                courierArray: courierArray,
               }
             : o
         )
@@ -388,6 +429,7 @@ export default function RestaurantPage() {
         await updateDoc(orderDocRef, {
             orderConfirmed: false,
             deliveryStatus: "Rejected by restaurant.",
+            
         });
 
         console.log(`Order ${orderId} successfully rejected.`);
@@ -1005,20 +1047,19 @@ export default function RestaurantPage() {
 }
 
 /*
-*** 1. Restaurant must show orders (have a confirm & reject button) -> orderConfirmed: null; Status: awaiting restaurant confirmation
-       * confirm -> orderConfirmed = True -> deliveryStatus: "order confirmed, being prepared"
-       * reject -> orderConfirmed = False -> deliveryStatus: "order rejected" 
-       * timeout -> deliveryStatus: "order rejected" (needs to be a central server running 24/7 [admin] that handles order rejection to work properly)
-       * on rejection, orderConfirmed = false -> message sent to userId in /users/{userId}/messages/message
-        -> createdAt = current time; message = "Order could not be fulfilled, refund sent" (Real refund later)
-
-
-*** The accepted orders go under heading "Orders awaiting pickup" there is no accept or reject button here" 
+*** The accepted orders under heading "Orders awaiting pickup"
        * button "Pick-up completed" pressed -> deliveryStatus: "order being delivered" (hypothetical: on courier arrival, courierId match)
                                             
-
 * Later: Delete profile field (top right nav user UI)
 * Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
+* Later: restaurant must show orders (have a confirm & reject button) -> orderConfirmed: null; Status: awaiting restaurant confirmation
+         confirm -> orderConfirmed = True -> deliveryStatus: "order confirmed, being prepared" [DONE]
+         reject -> orderConfirmed = False -> deliveryStatus: "order rejected" [DONE]
+         timeout -> deliveryStatus: "order rejected" (needs to be a central server running 24/7 [admin] that handles order rejection to work properly)
+         on rejection, orderConfirmed = false -> message sent to userId in /users/{userId}/messages/message
+         -> createdAt = current time; message = "Order could not be fulfilled, refund sent" [DONE]; 
+         -> possibly a copy of each message in a new collection of stored messages to view all later [LATER]
+         -> send refund [LATER]
 * Maybe: field to upload logo that appears on map
 * Advanced: If restaurant does not accept the order -> refund user if not accepted
 
@@ -1033,7 +1074,10 @@ B. validity of address is "enforced" by the restaurant manager wanting sales. Ad
 
 
 # Reused components:
-UserPage & RestaurantPage // ADDRESS to GEOLOCATION: OpenCage API -> async function geocodeAddress(address) { ...
+UserPage & RestaurantPage // ADDRESS to GEOLOCATION: OpenCage API 
+// -> async function geocodeAddress(address) { ...
+UserPage & RestaurantPage // distance calculation to find: restaurants within user location & couriers within restaurant location
+// -> function getDistanceInKm(lat1, lon1, lat2, lon2) { ...
 
 */
 

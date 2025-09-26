@@ -341,7 +341,7 @@ export default function CourierPage() {
 
 /*
 TODO
-*** 3. If orderConfirmed = True, it shows on task list
+*** 3. If orderConfirmed = True && courier within range, it shows on task list
 *** 4. Add an "Accept" or "Reject" button next to 1 task 
       -> If accept, courierId added to order form courierId field
       -> If reject, a new task is offered under Task List  (to limit preferential choices)

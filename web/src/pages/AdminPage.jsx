@@ -51,8 +51,8 @@ export default function AdminPage() {
 
 
 /*
-*** some way to access this page (no role, no link in navigation, separate admin login)
-*** update system variables here:
+* some way to access this page (no role, no link in navigation, separate admin login)
+* update system variables here:
 ~ max searchDistance
 ~ orderTimeout
 ~ geolocation update automatic length

@@ -798,9 +798,7 @@ export default function UserPage() {
 
 
 /*
-*** 2. Under current orders: Confirm deliveryStatus string showing restaurant rejects the order
 *** 6. if courier accepts offer; car icon appears on user's map according to courier gps
-
 
 * Later: Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message; delete account)
 * Later: replace tailwind with regular css or get tailwind working
