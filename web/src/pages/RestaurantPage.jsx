@@ -157,25 +157,54 @@ export default function RestaurantPage() {
     fetchOrCreate();
   }, [user]);
 
-  // Helper function to update Firestore (centralized logic, simpler)
+  // This function will now handle auto-rejection AND message sending
   const updateOrderToRejected = async (restaurantId, orderId) => {
     const orderDocRef = doc(
-      db,
-      "restaurants",
-      restaurantId,
-      "restaurantOrders",
-      orderId
+        db,
+        "restaurants",
+        restaurantId,
+        "restaurantOrders",
+        orderId
     );
+
     try {
-      await updateDoc(orderDocRef, {
-        orderConfirmed: false,
-        deliveryStatus: "Auto-rejected: Order timed out.",
-      });
-      console.log(`Order ${orderId} auto-rejected due to timeout.`);
-      return true; // Indicate success
+        // --- 1. READ the document to get the userId ---
+        const orderSnapshot = await getDoc(orderDocRef);
+        if (!orderSnapshot.exists()) {
+            console.error(`Order ${orderId} not found for auto-rejection.`);
+            return false; // Indicate failure
+        }
+        
+        const orderData = orderSnapshot.data();
+        const userId = orderData.userId; // Extracted the userId!
+
+        // --- 2. UPDATE the Order Status ---
+        await updateDoc(orderDocRef, {
+            orderConfirmed: false,
+            deliveryStatus: "Auto-rejected: Order timed out.",
+        });
+        
+        // --- 3. SEND Message to Customer (Conditional on userId) ---
+        if (userId) {
+            const messagesRef = collection(db, "users", userId, "messages");
+            
+            await addDoc(messagesRef, {
+                createdAt: serverTimestamp(), 
+                message: "Order could not be fulfilled, refund sent.",
+                read: false, 
+                type: "order_status",
+                orderId: orderId,
+            });
+            
+            console.log(`Auto-rejection message sent to user ${userId}.`);
+        }
+
+        console.log(`Order ${orderId} auto-rejected due to timeout.`);
+        return true; // Indicate success
+        
     } catch (err) {
-      console.error(`Failed to auto-reject order ${orderId}`, err);
-      return false;
+        console.error(`Failed to auto-reject order ${orderId} or send message:`, err);
+        return false;
     }
   };
 
@@ -358,7 +387,7 @@ export default function RestaurantPage() {
         // --- 2. UPDATE the Order Status (Rejection) ---
         await updateDoc(orderDocRef, {
             orderConfirmed: false,
-            deliveryStatus: "Rejected by restaurant: Order could not be fulfilled.",
+            deliveryStatus: "Rejected by restaurant.",
         });
 
         console.log(`Order ${orderId} successfully rejected.`);
@@ -385,14 +414,11 @@ export default function RestaurantPage() {
                     ? {
                         ...o,
                         orderConfirmed: false,
-                        deliveryStatus: "Rejected by restaurant: Order could not be fulfilled.",
+                        deliveryStatus: "Rejected by restaurant.",
                     }
                     : o
             )
         );
-        
-        alert("Order rejected and customer notified.");
-
     } catch (err) {
         console.error("Error rejecting order or sending message:", err);
         setError("Failed to reject order.");
