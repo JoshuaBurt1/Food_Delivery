@@ -341,11 +341,13 @@ export default function CourierPage() {
 
 /*
 TODO
+*** show 1 task to each courier, accept or reject
 *** 3. If orderConfirmed = True && courier within range, it shows on task list
 *** 4. Add an "Accept" or "Reject" button next to 1 task 
       -> If accept, courierId added to order form courierId field
       -> If reject, a new task is offered under Task List  (to limit preferential choices)
 *** 5. After accepting task moves under current task header, courier's current task = orderId (gps must be active)
+*** 6. if courier accepts offer; car icon appears on user's map according to courier gps
 *** 7. Courier presses "Picked up" button when within a close gps radius -> deliveryStatus: "order being delivered" (if restaurant doesn't)
 *** 8. Courier presses "Delivered" button when within a close gps radius -> deliveryStatus: "completed"
 *** 9. Order copied to collection: systemFiles/completedOrders -> order deleted from systemFiles/restaurantOrders 

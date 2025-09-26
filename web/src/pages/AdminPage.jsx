@@ -52,13 +52,14 @@ export default function AdminPage() {
 
 /*
 * some way to access this page (no role, no link in navigation, separate admin login)
-* update system variables here:
-~ max searchDistance
-~ orderTimeout
-~ geolocation update automatic length
-~ order timeout update automatic length
 
-shows collection couriers, restaurants, users, systemFiles
-shows courier, restaurant manager, and user messages
-handles database issues: e.g. courier didn't change the deliveryStatus option and delivered the food
+* SYSTEM VARIABLES SHOULD BE UPDATED HERE
+~ maxRestaurantSearchDistance <- (currently hardcoded Math.min(radius, [100]) in UserPage.jsx)
+~ maxCourierSearchDistance <- (currently hardcoded as distKm <= [50] in RestaurantPage.jsx)
+~ courierTaskAvailabilityTime <- (courier's time range to click accept or reject)
+~ geolocation update automatic length <- (currently hardcoded as setTimeout(throttleUpdate, 10000) in CourierPage.jsx)
+~ timeoutValue : order timeout update automatic length  <- (currently hardcoded as }, 10000); in RestaurantPage.jsx)
+
+* access to collection couriers, restaurants, users, systemFiles (variables and messages)
+* handles database issues: e.g. courier didn't change the deliveryStatus option and delivered the food
  */

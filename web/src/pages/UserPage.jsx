@@ -798,8 +798,6 @@ export default function UserPage() {
 
 
 /*
-*** 6. if courier accepts offer; car icon appears on user's map according to courier gps
-
 * Later: Better UI -> top right nav is UserPage user profile link (Name, email, phone* Please complete your user profile before ordering message; delete account)
 * Later: replace tailwind with regular css or get tailwind working
 * Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise) or just use location services

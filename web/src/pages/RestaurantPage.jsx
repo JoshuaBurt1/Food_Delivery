@@ -1047,9 +1047,24 @@ export default function RestaurantPage() {
 }
 
 /*
+*** courierArray created to find all nearby couriers available for order (should be admin server job for orderConfirmed=true orders and updated consistently)
 *** The accepted orders under heading "Orders awaiting pickup"
        * button "Pick-up completed" pressed -> deliveryStatus: "order being delivered" (hypothetical: on courier arrival, courierId match)
-                                            
+                               
+* Courier:
+Task Accept & reject button; add earning amount based on total cost
+ -> if accepted, courierId added, deliveryStatus = "Order confirmed. Courier assigned"; car icon appears on user map
+ -> if rejected, remove from list
+
+* Server (24/7) tasks:
+* clients need to go through server to access database
+~All restaurantOrders: updates orderTimeout periodically (currently: each restaurant is doing this client side, doesn't work if the client restaurant not online)
+~All restaurantOrders: a simple periodically updating function that assigns orders to multiple couriers based on (currently: each restaurant is doing this client side, doesn't work if the client restaurant not online);
+- Need a rejectedArray if courier rejects
+- Need a periodic courierArray updater that checks against rejectedArray and only updates if courierId = ""
+- If no available couriers, reassign to rejectedArray with higher earning
+
+
 * Later: Delete profile field (top right nav user UI)
 * Later: Add a precise location pointer on clicking the map (reason: the geolocator is not that precise)
 * Later: restaurant must show orders (have a confirm & reject button) -> orderConfirmed: null; Status: awaiting restaurant confirmation
