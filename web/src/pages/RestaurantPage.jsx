@@ -985,7 +985,7 @@ export default function RestaurantPage() {
                         onClick={() => handleConfirmOrder(order.orderId)}
                         className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
                       >
-                        Confirm
+                        Accept
                       </button>
                       <button
                         onClick={() => handleRejectOrder(order.orderId)}

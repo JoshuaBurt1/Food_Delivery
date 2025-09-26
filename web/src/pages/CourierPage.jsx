@@ -230,18 +230,28 @@ export default function CourierPage() {
 
         let allOrders = [];
 
-        // For each restaurant, get its orders
         for (const restaurantDoc of restaurantsSnapshot.docs) {
           const restaurantId = restaurantDoc.id;
           const ordersRef = collection(db, "restaurants", restaurantId, "restaurantOrders");
           const ordersSnapshot = await getDocs(ordersRef);
 
-          // For each order in this restaurantOrders subcollection
           ordersSnapshot.forEach((orderDoc) => {
             const orderData = orderDoc.data();
-            // Filter only confirmed orders
-            if (orderData.orderConfirmed === true) {
-              allOrders.push(orderData);
+            // existing filter:
+            // if (orderData.orderConfirmed === true) {
+            //   allOrders.push(orderData);
+            // }
+            // new / improved filter:
+            if (
+              orderData.orderConfirmed === true
+              && Array.isArray(orderData.courierArray)
+              && courierData?.courierId
+              && orderData.courierArray.includes(courierData.courierId)
+            ) {
+              allOrders.push({
+                ...orderData,
+                restaurantId,  // maybe include restaurantId if needed
+              });
             }
           });
         }
@@ -255,8 +265,12 @@ export default function CourierPage() {
       }
     };
 
-    fetchAllOrders();
-  }, []);
+    // Only fetch once courierData has loaded so you have `courierId`
+    if (courierData?.courierId) {
+      fetchAllOrders();
+    }
+  }, [courierData]);
+
 
   if (loadingAuth) return <div>Loading authentication...</div>;
   if (!user) return <Navigate to="/login" />;
@@ -328,6 +342,20 @@ export default function CourierPage() {
                 <strong>Total Prep Time:</strong> {order.totalPrepTime} min <br />
                 <strong>Restaurant Address:</strong> {order.restaurantAddress} <br />
                 <strong>User Address:</strong> {order.userAddress}
+                 <div className="mt-2 space-x-2">
+                  <button
+                    className="bg-green-500 text-white px-3 py-1 rounded"
+                    onClick={() => handleAccept(order)}
+                  >
+                    Accept
+                  </button>
+                  <button
+                    className="bg-red-500 text-white px-3 py-1 rounded"
+                    onClick={() => handleReject(order)}
+                  >
+                    Reject
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -341,8 +369,6 @@ export default function CourierPage() {
 
 /*
 TODO
-*** show 1 task to each courier, accept or reject
-*** 3. If orderConfirmed = True && courier within range, it shows on task list
 *** 4. Add an "Accept" or "Reject" button next to 1 task 
       -> If accept, courierId added to order form courierId field
       -> If reject, a new task is offered under Task List  (to limit preferential choices)
@@ -353,7 +379,7 @@ TODO
 *** 9. Order copied to collection: systemFiles/completedOrders -> order deleted from systemFiles/restaurantOrders 
 *** 10. Earnings increase     
 
-
+* show 1 task at a time to each courier via server scheduling
 * Later: add phone number
 * Later: Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)
                       Job disclosure form: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
