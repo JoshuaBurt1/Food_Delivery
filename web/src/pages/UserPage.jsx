@@ -10,6 +10,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import { Navigate, useNavigate } from "react-router-dom";
@@ -338,17 +339,51 @@ export default function UserPage() {
     setFilteredRestaurants(filtered);
   }, [searchRadius, userLatLng, allRestaurants]);
 
+  //ORDERS FOR USER
   useEffect(() => {
-    if (!userData?.id) return;
+    if (!userData?.id || allRestaurants.length === 0) return;
 
-    fetchUserOrders(); // initial fetch
+    const unsubscribers = [];
+    let collectedOrders = [];
 
-    const interval = setInterval(() => {
-      fetchUserOrders();
-    }, 30000); // every 30 seconds
+    for (const restaurant of allRestaurants) {
+      const ordersRef = collection(db, "restaurants", restaurant.id, "restaurantOrders");
 
-    return () => clearInterval(interval); // cleanup on unmount
-  }, [userData]);
+      const unsubscribe = onSnapshot(ordersRef, (snapshot) => {
+        const restaurantOrders = [];
+
+        snapshot.forEach((docSnap) => {
+          const orderData = docSnap.data();
+          if (orderData.userId === userData.id) {
+            restaurantOrders.push({ ...orderData, orderId: docSnap.id });
+            console.log("Checking order:", {
+              fromRestaurant: restaurant.storeName,
+              orderUserId: orderData.userId,
+              currentUserId: userData.id,
+            });
+          }
+        });
+
+        // Update collected orders from all restaurants
+        collectedOrders = [
+          ...collectedOrders.filter(o => o.fromRestaurant !== restaurant.storeName),
+          ...restaurantOrders.map(order => ({ ...order, fromRestaurant: restaurant.storeName })),
+        ];
+
+        // Set only once all restaurants have been processed at least once
+        //setUserOrders([...collectedOrders].sort((a, b) => b.createdAt?.toDate() - a.createdAt?.toDate()));
+      //});
+        setUserOrders([...collectedOrders]);
+      });
+
+      unsubscribers.push(unsubscribe);
+    }
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+    };
+  }, [userData?.id, allRestaurants]);
+
 
   // Handle phone and address update form submit
   const phoneRegex = /^\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}$/;
@@ -419,37 +454,6 @@ export default function UserPage() {
   }, {});
 
   const filteredTypes = Object.keys(groupedFilteredByType).sort();
-
-  //ORDER STATUS updates
-  const fetchUserOrders = async () => {
-    if (!userData?.id) return;
-    try {
-      const ordersForUser = [];
-      // Loop through all restaurants
-      for (const restaurant of allRestaurants) {
-        const restaurantId = restaurant.id;
-        const ordersRef = collection(db, "restaurants", restaurantId, "restaurantOrders");
-
-        const ordersSnap = await getDocs(ordersRef);
-        ordersSnap.forEach((docSnap) => {
-          const orderData = docSnap.data();
-          if (orderData.userId === userData.id) {
-            ordersForUser.push({ ...orderData, orderId: docSnap.id });
-          }
-        });
-      }
-      setUserOrders((prevOrders) => {
-        const prevString = JSON.stringify(prevOrders);
-        const newString = JSON.stringify(ordersForUser);
-        if (prevString !== newString) {
-          return ordersForUser;
-        }
-        return prevOrders;
-      });
-    } catch (err) {
-      console.error("Failed to fetch user orders from restaurant subcollections:", err);
-    }
-  };
 
   return (
     <div className="p-6">

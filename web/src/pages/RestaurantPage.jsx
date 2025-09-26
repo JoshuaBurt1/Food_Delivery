@@ -11,6 +11,8 @@ import {
   Timestamp,
   doc,
   updateDoc,
+  onSnapshot,
+  serverTimestamp,
 } from "firebase/firestore";
 
 // ADDRESS to GEOLOCATION: OpenCage API
@@ -155,35 +157,141 @@ export default function RestaurantPage() {
     fetchOrCreate();
   }, [user]);
 
-  // Fetch orders belonging to this restaurant
+  // Helper function to update Firestore (centralized logic, simpler)
+  const updateOrderToRejected = async (restaurantId, orderId) => {
+    const orderDocRef = doc(
+      db,
+      "restaurants",
+      restaurantId,
+      "restaurantOrders",
+      orderId
+    );
+    try {
+      await updateDoc(orderDocRef, {
+        orderConfirmed: false,
+        deliveryStatus: "Auto-rejected: Order timed out.",
+      });
+      console.log(`Order ${orderId} auto-rejected due to timeout.`);
+      return true; // Indicate success
+    } catch (err) {
+      console.error(`Failed to auto-reject order ${orderId}`, err);
+      return false;
+    }
+  };
+
+  // --- Realtime listener for restaurantOrders (Initial load + updates)
+  useEffect(() => {
+    if (!restaurantData?.id) {
+      setLoadingOrders(false);
+      return;
+    }
+
+    const ordersRef = collection(
+      db,
+      "restaurants",
+      restaurantData.id,
+      "restaurantOrders"
+    );
+
+    setLoadingOrders(true);
+
+    // This listener fires once on subscription (initial load) and on every update
+    const unsub = onSnapshot(ordersRef, async (snapshot) => {
+      let fetchedOrders = snapshot.docs.map((docSnap) => ({
+        orderId: docSnap.id,
+        ...docSnap.data(),
+      }));
+
+      const now = new Date(); // The currentTime variable
+      
+      console.log("--- Initial Load/Realtime Update Log (onSnapshot) ---");
+      console.log("Current Time (now):", now.toLocaleString()); // currentTime
+      
+      const autoRejectPromises = [];
+
+      // Find unhandled orders that are past their timeout
+      const timedOutOrders = fetchedOrders.filter(order => {
+        const timeout = order.orderTimeout?.toDate?.() || new Date(order.orderTimeout);
+        
+        // Log the variables for every unconfirmed order
+        console.log(`Order ${order.orderId}:`);
+        console.log("  orderTimeout:", timeout ? timeout.toLocaleString() : 'N/A'); // orderTimeout
+        console.log("  deliveryStatus:", order.deliveryStatus); // deliveryStatus
+        console.log("  orderConfirmed:", order.orderConfirmed); // orderConfirmed
+        
+        // Auto-rejection logic check
+        const shouldReject = timeout < now && order.orderConfirmed === null;
+        if (shouldReject) {
+            console.log(`!!! Order ${order.orderId} is TIMED OUT and UNHANDLED.`);
+        }
+
+        return shouldReject;
+      });
+
+      // 1. Trigger ALL necessary Firestore updates in parallel
+      timedOutOrders.forEach(order => {
+        autoRejectPromises.push(updateOrderToRejected(restaurantData.id, order.orderId));
+      });
+
+      // Wait for all Firestore updates to complete (optional, but ensures console logs finish)
+      await Promise.all(autoRejectPromises);
+
+      // 2. IMPORTANT: Immediately update the local state to reflect the rejection
+      if (timedOutOrders.length > 0) {
+        fetchedOrders = fetchedOrders.map(order => {
+          if (timedOutOrders.some(tOrder => tOrder.orderId === order.orderId)) {
+            // Update the local object with the rejected status
+            return {
+              ...order,
+              orderConfirmed: false,
+              deliveryStatus: "Auto-rejected: Order timed out."
+            };
+          }
+          return order;
+        });
+      }
+
+      // Set the final state
+      setOrders(fetchedOrders);
+      setLoadingOrders(false);
+    }, (error) => {
+      console.error("Error listening to orders:", error);
+      setError("Error fetching orders.");
+      setLoadingOrders(false);
+    });
+
+    return () => unsub(); // Cleanup listener on unmount/dependency change
+  }, [restaurantData?.id]);
+
+  // --- Running check for orders that are approaching/past timeout (every 10 seconds)
   useEffect(() => {
     if (!restaurantData?.id) return;
 
-    const fetchOrders = async () => {
-      try {
-        const ordersRef = collection(db, "restaurants", restaurantData.id, "restaurantOrders");
-        const ordersSnap = await getDocs(ordersRef);
-        const fetchedOrders = [];
+    const interval = setInterval(() => {
+      const now = new Date(); // The currentTime variable
 
-        ordersSnap.forEach((docSnap) => {
-          const orderData = docSnap.data();
-          fetchedOrders.push({
-            ...orderData,
-            orderId: docSnap.id, // add document ID
-          });
-        });
-
-        setOrders(fetchedOrders);
-      } catch (err) {
-        console.error("Error fetching restaurant orders from subcollection:", err);
-        setError("Failed to load orders.");
-      } finally {
-        setLoadingOrders(false);
-      }
-    };
-
-    fetchOrders();
-  }, [restaurantData]);
+      console.log("--- Running Interval Check (setInterval) ---");
+      console.log("Current Time (now):", now.toLocaleString()); // currentTime
+      
+      orders.forEach((order) => {
+        // Only check unconfirmed orders
+        if (order.orderConfirmed === null) {
+          const timeout = order.orderTimeout?.toDate?.() || (order.orderTimeout ? new Date(order.orderTimeout) : null);
+          // Log the variables
+          console.log(`Order ${order.orderId}:`);
+          console.log("  orderTimeout:", timeout ? timeout.toLocaleString() : 'N/A'); // orderTimeout
+          console.log("  deliveryStatus:", order.deliveryStatus); // deliveryStatus
+          console.log("  orderConfirmed:", order.orderConfirmed); // orderConfirmed
+          
+          if (timeout && timeout < now) {
+            console.log(`!!! Order ${order.orderId} is TIMED OUT, initiating rejection.`);
+            updateOrderToRejected(restaurantData.id, order.orderId);
+          }
+        }
+      });
+    }, 10000); // Check every 10 seconds
+    return () => clearInterval(interval);
+  }, [restaurantData?.id, orders]);
 
   // Confirm / Reject handlers
   const handleConfirmOrder = async (orderId) => {
@@ -220,34 +328,74 @@ export default function RestaurantPage() {
   };
 
   const handleRejectOrder = async (orderId) => {
-    try {
-      const orderDocRef = doc(
+    // 1. Define the reference to the order document
+    const orderDocRef = doc(
         db,
         "restaurants",
-        restaurantData.id,
+        restaurantData.id, // Assuming restaurantData is in scope
         "restaurantOrders",
         orderId
-      );
-      await updateDoc(orderDocRef, {
-        orderConfirmed: false,
-        deliveryStatus: "Rejected by restaurant.",
-      });
-      
-      // Update local state
-      setOrders((prev) =>
-        prev.map((o) =>
-          o.orderId === orderId
-            ? {
-                ...o,
-                orderConfirmed: false,
-                deliveryStatus: "Rejected by restaurant.",
-              }
-            : o
-        )
-      );
+    );
+    
+    try {
+        // --- 1. READ the document to get the userId ---
+        const orderSnapshot = await getDoc(orderDocRef);
+        if (!orderSnapshot.exists()) {
+            console.error(`Order ${orderId} not found.`);
+            setError("Order not found.");
+            return;
+        }
+
+        const orderData = orderSnapshot.data();
+        const userId = orderData.userId; // <-- Extracted the userId!
+
+        if (!userId) {
+            console.error(`userId not found on order ${orderId}. Cannot notify customer.`);
+            // Proceed with order rejection but skip notification
+            // ... (optional: log or alert manager)
+        }
+        
+        // --- 2. UPDATE the Order Status (Rejection) ---
+        await updateDoc(orderDocRef, {
+            orderConfirmed: false,
+            deliveryStatus: "Rejected by restaurant: Order could not be fulfilled.",
+        });
+
+        console.log(`Order ${orderId} successfully rejected.`);
+        
+        // --- 3. SEND Message to Customer (Conditional on userId) ---
+        if (userId) {
+            const messagesRef = collection(db, "users", userId, "messages");
+            
+            await addDoc(messagesRef, {
+                createdAt: serverTimestamp(), // Use Firestore serverTimestamp
+                message: "Order could not be fulfilled, refund sent.",
+                read: false, 
+                type: "order_status",
+                orderId: orderId,
+            });
+            
+            console.log(`Message sent to user ${userId}.`);
+        }
+
+        // --- 4. Update Local State ---
+        setOrders((prev) =>
+            prev.map((o) =>
+                o.orderId === orderId
+                    ? {
+                        ...o,
+                        orderConfirmed: false,
+                        deliveryStatus: "Rejected by restaurant: Order could not be fulfilled.",
+                    }
+                    : o
+            )
+        );
+        
+        alert("Order rejected and customer notified.");
+
     } catch (err) {
-      console.error("Error rejecting order:", err);
-      setError("Failed to reject order.");
+        console.error("Error rejecting order or sending message:", err);
+        setError("Failed to reject order.");
     }
   };
 
@@ -260,6 +408,9 @@ export default function RestaurantPage() {
         Error: {error}
       </div>
     );
+  
+  const unhandledOrders = orders.filter(order => order.orderConfirmed == null || order.orderConfirmed === false);
+  const confirmedOrders = orders.filter(order => order.orderConfirmed === true);
 
   return (
     <div className="p-6">
@@ -724,17 +875,16 @@ export default function RestaurantPage() {
           </ul>
         </div>
       )}
-
-      {/* Current Orders Section */}
+      <hr className="my-8 border-t-2 border-gray-300" />
       <div className="mt-10">
-        <h2 className="text-xl font-semibold mb-4">Current Orders</h2>
+        <h2 className="text-xl font-semibold mb-4">New Orders Awaiting Confirmation</h2>
         {loadingOrders ? (
           <p>Loading orders…</p>
-        ) : orders.length === 0 ? (
-          <p>No current orders.</p>
+        ) : unhandledOrders.length === 0 ? ( // <-- Using the filtered array
+          <p>No new orders awaiting confirmation.</p>
         ) : (
           <div className="space-y-4">
-            {orders.map((order) => (
+            {unhandledOrders.map((order) => ( // <-- Mapping the filtered array
               <div
                 key={order.orderId}
                 className="border rounded p-4 bg-white shadow-sm"
@@ -760,39 +910,84 @@ export default function RestaurantPage() {
                   ))}
                 </ul>
 
-                <div className="mt-4 flex space-x-2">
-                  <button
-                    onClick={() => handleConfirmOrder(order.orderId)}
-                    disabled={order.orderConfirmed === true}
-                    className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    Confirm
-                  </button>
-                  <button
-                    onClick={() => handleRejectOrder(order.orderId)}
-                    disabled={order.orderConfirmed === false}
-                    className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 disabled:opacity-50"
-                  >
-                    Reject
-                  </button>
-                </div>
+                {/* Conditional Buttons: ONLY show for unhandled orders (null or undefined) */}
+                {order.orderConfirmed == null && (
+                    <div className="mt-4 flex space-x-2">
+                      <button
+                        onClick={() => handleConfirmOrder(order.orderId)}
+                        className="bg-green-600 text-white px-3 py-1 rounded hover:bg-green-700"
+                      >
+                        Confirm
+                      </button>
+                      <button
+                        onClick={() => handleRejectOrder(order.orderId)}
+                        className="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                )}
+                {/* Note: Rejected orders (false) will appear here but without buttons */}
               </div>
             ))}
           </div>
         )}
       </div>
-    </div>
-  );
+
+      {/* --- Orders Awaiting Pickup Section (Confirmed Orders) --- */}
+      <hr className="my-8 border-t-2 border-gray-300" />
+      <div className="mt-10">
+        <h2 className="text-xl font-semibold mb-4">Orders Awaiting Pickup</h2>
+        {loadingOrders ? (
+          <p>Loading orders…</p>
+        ) : confirmedOrders.length === 0 ? ( // <-- Using the confirmedOrders array
+          <p>No orders currently awaiting pickup.</p>
+        ) : (
+          <div className="space-y-4">
+            {confirmedOrders.map((order) => ( // <-- Mapping the filtered array
+              <div
+                key={order.orderId}
+                className="border rounded p-4 bg-white shadow-sm border-green-500"
+              >
+                <p>
+                  <strong>Order ID:</strong> {order.orderId}
+                </p>
+                <p>
+                  <strong>Status:</strong> {order.deliveryStatus}
+                </p>
+                <p>
+                  <strong>Estimated Ready:</strong>{" "}
+                  {order.estimatedReadyTime?.toDate().toLocaleString()}
+                </p>
+                <p>
+                  <strong>Items:</strong>
+                </p>
+                <ul className="ml-4 list-disc">
+                  {order.items?.map((item, i) => (
+                    <li key={i}>
+                      {item.name} × {item.quantity} (prep: {item.prepTime} min)
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+</div>
+);
 }
-
-
 
 /*
 *** 1. Restaurant must show orders (have a confirm & reject button) -> orderConfirmed: null; Status: awaiting restaurant confirmation
        * confirm -> orderConfirmed = True -> deliveryStatus: "order confirmed, being prepared"
-       * reject -> orderConfirmed = False -> deliveryStatus: "order rejected" (this could then go to another restaurant...)
-       * timeout -> deliveryStatus: "order rejected" (this could then go to another restaurant...)
-*** The accepted orders go under heading "Orders awaiting pickup" 
+       * reject -> orderConfirmed = False -> deliveryStatus: "order rejected" 
+       * timeout -> deliveryStatus: "order rejected" (needs to be a central server running 24/7 [admin] that handles order rejection to work properly)
+       * on rejection, orderConfirmed = false -> message sent to userId in /users/{userId}/messages/message
+        -> createdAt = current time; message = "Order could not be fulfilled, refund sent" (Real refund later)
+
+
+*** The accepted orders go under heading "Orders awaiting pickup" there is no accept or reject button here" 
        * button "Pick-up completed" pressed -> deliveryStatus: "order being delivered" (hypothetical: on courier arrival, courierId match)
                                             
 

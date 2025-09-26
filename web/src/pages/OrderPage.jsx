@@ -14,6 +14,7 @@ export default function OrderPage() {
   const [userId, setUserId] = useState(null);
   const [userData, setUserData] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  const [timeoutValue, setTimeoutValue] = useState(null);
 
   function toGeoPoint(location) {
     if (!location) return null;
@@ -49,6 +50,31 @@ export default function OrderPage() {
 
     return () => unsubscribe();
   }, [navigate]);
+
+  // FETCH timeout value
+  useEffect(() => {
+    const fetchTimeoutValue = async () => {
+      try {
+        const settingsRef = doc(db, "systemFiles", "systemVariables");
+        const settingsSnap = await getDoc(settingsRef);
+
+        if (settingsSnap.exists()) {
+          const data = settingsSnap.data();
+          if (typeof data.timeoutValue === "number") {
+            setTimeoutValue(data.timeoutValue);
+            return;
+          }
+        }
+      } catch (error) {
+        console.warn("Failed to fetch timeoutValue:", error);
+      }
+
+      // Fallback to default
+      setTimeoutValue(10);
+    };
+
+    fetchTimeoutValue();
+  }, []);
 
   // Redirect if no restaurant
   useEffect(() => {
@@ -116,17 +142,21 @@ export default function OrderPage() {
           prepTime: restaurant.menu[idx].prepTime || 0,
         }));
 
+      // Setting time based variables
       const totalPrepTime = items.reduce(
         (sum, item) => sum + (item.prepTime || 0) * item.quantity,
         0
       );
-
       const estimatedReadyDate = new Date();
       estimatedReadyDate.setMinutes(estimatedReadyDate.getMinutes() + totalPrepTime);
+      const createdAt = Timestamp.now();
+      const timeoutMinutes = timeoutValue ?? 10;
+      const orderTimeout = Timestamp.fromMillis(createdAt.toMillis() + timeoutMinutes * 60 * 1000);
 
       // Step 4: Construct the order document
       const newOrder = {
-        createdAt: Timestamp.now(),
+        createdAt: createdAt,
+        orderTimeout: orderTimeout,
         deliveryStatus: "Awaiting restaurant confirmation.",
         orderConfirmed: null,
         courierId: "",
