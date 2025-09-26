@@ -1024,6 +1024,9 @@ export default function RestaurantPage() {
                   <strong>Status:</strong> {order.deliveryStatus}
                 </p>
                 <p>
+                  <strong>CourierId:</strong> {order.courierId}
+                </p>
+                <p>
                   <strong>Estimated Ready:</strong>{" "}
                   {order.estimatedReadyTime?.toDate().toLocaleString()}
                 </p>
@@ -1047,14 +1050,9 @@ export default function RestaurantPage() {
 }
 
 /*
-*** courierArray created to find all nearby couriers available for order (should be admin server job for orderConfirmed=true orders and updated consistently)
-*** The accepted orders under heading "Orders awaiting pickup"
+**** The accepted orders under heading "Orders awaiting pickup"
        * button "Pick-up completed" pressed -> deliveryStatus: "order being delivered" (hypothetical: on courier arrival, courierId match)
-                               
-* Courier:
-Task Accept & reject button; add earning amount based on total cost
- -> if accepted, courierId added, deliveryStatus = "Order confirmed. Courier assigned"; car icon appears on user map
- -> if rejected, remove from list
+
 
 * Server (24/7) tasks:
 * clients need to go through server to access database
@@ -1063,6 +1061,7 @@ Task Accept & reject button; add earning amount based on total cost
 - Need a rejectedArray if courier rejects
 - Need a periodic courierArray updater that checks against rejectedArray and only updates if courierId = ""
 - If no available couriers, reassign to rejectedArray with higher earning
+* courierArray created to find all nearby couriers available for order (should be admin server job for orderConfirmed=true orders and updated consistently)
 
 
 * Later: Delete profile field (top right nav user UI)

@@ -10,6 +10,7 @@ import {
   GeoPoint,
   updateDoc,
   doc,
+  writeBatch,
 } from "firebase/firestore";
 
 export default function CourierPage() {
@@ -21,6 +22,7 @@ export default function CourierPage() {
   const [locationAccessDenied, setLocationAccessDenied] = useState(false);
   const [orders, setOrders] = useState([]);
   const [fetchingOrders, setFetchingOrders] = useState(true);
+  const [currentTask, setCurrentTask] = useState(null);
   const locationQueue = useRef(null);
   const throttleTimeout = useRef(null);
   const courierDataRef = useRef(courierData);
@@ -228,35 +230,46 @@ export default function CourierPage() {
         const restaurantsRef = collection(db, "restaurants");
         const restaurantsSnapshot = await getDocs(restaurantsRef);
 
-        let allOrders = [];
+        let availableOrders = [];
+        let assignedOrder = null;
 
         for (const restaurantDoc of restaurantsSnapshot.docs) {
           const restaurantId = restaurantDoc.id;
-          const ordersRef = collection(db, "restaurants", restaurantId, "restaurantOrders");
+          const ordersRef = collection(
+            db,
+            "restaurants",
+            restaurantId,
+            "restaurantOrders"
+          );
           const ordersSnapshot = await getDocs(ordersRef);
 
           ordersSnapshot.forEach((orderDoc) => {
             const orderData = orderDoc.data();
-            // existing filter:
-            // if (orderData.orderConfirmed === true) {
-            //   allOrders.push(orderData);
-            // }
-            // new / improved filter:
+            const fullOrder = { ...orderData, restaurantId }; // include restaurantId so you can update later etc.
+
+            // If this courier is the one assigned
             if (
-              orderData.orderConfirmed === true
-              && Array.isArray(orderData.courierArray)
-              && courierData?.courierId
-              && orderData.courierArray.includes(courierData.courierId)
+              orderData.orderConfirmed === true &&
+              orderData.courierId === courierData?.courierId
             ) {
-              allOrders.push({
-                ...orderData,
-                restaurantId,  // maybe include restaurantId if needed
-              });
+              // Found the current task
+              assignedOrder = fullOrder;
+            }
+            // Else if this courier is eligible but order not yet accepted (courierId is empty string)
+            else if (
+              orderData.orderConfirmed === true &&
+              orderData.courierId === "" &&
+              Array.isArray(orderData.courierArray) &&
+              courierData?.courierId &&
+              orderData.courierArray.includes(courierData.courierId)
+            ) {
+              availableOrders.push(fullOrder);
             }
           });
         }
 
-        setOrders(allOrders);
+        setOrders(availableOrders);
+        setCurrentTask(assignedOrder);  // may be null if none assigned
       } catch (err) {
         console.error("Error fetching orders:", err);
         setError("Failed to fetch orders.");
@@ -265,12 +278,66 @@ export default function CourierPage() {
       }
     };
 
-    // Only fetch once courierData has loaded so you have `courierId`
     if (courierData?.courierId) {
       fetchAllOrders();
     }
   }, [courierData]);
 
+  // handleAccept as you have, plus state updates
+  const handleAccept = async (order) => {
+    try {
+      const orderDocRef = doc(
+        db,
+        "restaurants",
+        order.restaurantId,
+        "restaurantOrders",
+        order.orderId
+      );
+      const courierDocRef = doc(db, "couriers", courierData.id);
+
+      const batch = writeBatch(db);
+
+      batch.update(orderDocRef, {
+        courierConfirmed: true,
+        deliveryStatus: "Accepted by courier — picking up soon",
+        courierId: courierData.courierId,
+      });
+
+      batch.update(courierDocRef, {
+        currentTask: order.orderId,
+      });
+
+      await batch.commit();
+
+      // After commit succeeds, update local state
+      setCurrentTask({ ...order, courierId: courierData.courierId });
+      setOrders((prev) => prev.filter((o) => o.orderId !== order.orderId));
+    } catch (err) {
+      console.error("Error accepting order:", err);
+      setError("Failed to accept order.");
+    }
+  };
+
+  const handleReject = async (order) => {
+    try {
+      const orderDocRef = doc(
+        db,
+        "restaurants",
+        order.restaurantId,
+        "restaurantOrders",
+        order.orderId
+      );
+      await updateDoc(orderDocRef, {
+        courierConfirmed: false,
+        courierRejectArray: courierData.courierId,
+      });
+      // Also remove it locally
+      setOrders((prev) => prev.filter((o) => o.orderId !== order.orderId));
+    } catch (err) {
+      console.error("Error rejecting order:", err);
+      setError("Failed to reject order.");
+    }
+  };
 
   if (loadingAuth) return <div>Loading authentication...</div>;
   if (!user) return <Navigate to="/login" />;
@@ -317,20 +384,35 @@ export default function CourierPage() {
 
         <hr className="my-8 border-t-2 border-gray-300" />
 
-        <h2 className="text-xl font-semibold mb-4">📝 Task List</h2>
+        <h2 className="text-xl font-semibold">Current Task</h2>
+        {fetchingOrders ? (
+          <p>Loading tasks…</p>
+        ) : currentTask ? (
+          <section className="mb-8">
+            <div className="p-4 border rounded bg-gray-100">
+              <p><strong>Order ID:</strong> {currentTask.orderId}</p>
+              <p><strong>Restaurant:</strong> {currentTask.restaurantAddress}</p>
+              <p><strong>User Address:</strong> {currentTask.userAddress}</p>
+              {/* maybe show an “Abandon” or “Complete” button? */}
+            </div>
+          </section>
+        ) : (
+          <p>No current tasks.</p>
+        )}
 
+        <hr className="my-8 border-t-2 border-gray-300" />
+
+        {/* Task List (you probably already have this part below) */}
+        <h2 className="text-xl font-semibold mb-4">📝 Task List</h2>
         {fetchingOrders ? (
           <p>Loading tasks…</p>
         ) : orders.length === 0 ? (
           <p>No tasks available.</p>
         ) : (
           <ul className="list-disc list-inside text-gray-600">
-            {orders
-            .filter((order) => order.orderConfirmed === true)
-            .map((order, idx) => (
+            {orders.map((order, idx) => (
               <li key={idx} className="p-4 mb-4 border rounded bg-gray-50">
                 <strong>Order ID:</strong> {order.orderId} <br />
-                <strong>Status:</strong> {order.deliveryStatus} <br />
                 <strong>Items:</strong>
                 <ul className="ml-4 list-disc">
                   {order.items.map((item, i) => (
@@ -342,7 +424,7 @@ export default function CourierPage() {
                 <strong>Total Prep Time:</strong> {order.totalPrepTime} min <br />
                 <strong>Restaurant Address:</strong> {order.restaurantAddress} <br />
                 <strong>User Address:</strong> {order.userAddress}
-                 <div className="mt-2 space-x-2">
+                <div className="mt-2 space‑x‑2">
                   <button
                     className="bg-green-500 text-white px-3 py-1 rounded"
                     onClick={() => handleAccept(order)}
@@ -369,17 +451,24 @@ export default function CourierPage() {
 
 /*
 TODO
+*** For an order to appear
+      -> orderData.orderConfirmed === true && orderData.courierId === "" && courierId in courierArray [DONE]
+      -> add order "payment" [total, restaurant, courier, system] field to order; need an algorithm to divide up payment
+      -> only show payment/courier on the task (incentive to accept); likewise for restaurantPage; likewise for admin record
 *** 4. Add an "Accept" or "Reject" button next to 1 task 
-      -> If accept, courierId added to order form courierId field
-      -> If reject, a new task is offered under Task List  (to limit preferential choices)
-*** 5. After accepting task moves under current task header, courier's current task = orderId (gps must be active)
-*** 6. if courier accepts offer; car icon appears on user's map according to courier gps
-*** 7. Courier presses "Picked up" button when within a close gps radius -> deliveryStatus: "order being delivered" (if restaurant doesn't)
-*** 8. Courier presses "Delivered" button when within a close gps radius -> deliveryStatus: "completed"
-*** 9. Order copied to collection: systemFiles/completedOrders -> order deleted from systemFiles/restaurantOrders 
-*** 10. Earnings increase     
+      -> to accept, courier/{courierId} field currentTask must be ""; if not alert -> "You must complete your current task before accepting a new one"
+      -> If accept, courierId added to order form courierId field [DONE]  && (gps must be active)
+      -> After accepting task moves under current task header, courierCurrent task = orderId [DONE]
+      -> Car icon appears on user's map according to courier gps
+      -> If reject, courierId added to courierRejectArray, another courier must pick it up [DONE]
+      -> Later: a new task is offered under Task List (to limit preferential choices)
 
-* show 1 task at a time to each courier via server scheduling
+*** 5. Courier presses "Picked up" button when within a close gps radius -> deliveryStatus: "order being delivered" (if restaurant doesn't)
+*** 6. Courier presses "Delivered" button when within a close gps radius -> deliveryStatus: "completed"
+*** 7. Order copied to collection: systemFiles/completedOrders -> order deleted from systemFiles/restaurantOrders 
+*** 8. couriers/{courierId} field earnings increase = to order "restaurants/{restaurantId}/restaurantOrders/{orderId} field payment/courier" field     
+
+* Later: show 1 task at a time to each courier via server scheduling
 * Later: add phone number
 * Later: Better UI -> top right nav is CourierPage user profile link (Name, email, phone* Please complete your user profile before continuing)
                       Job disclosure form: standard procedures/rules - gps tracking; click deliveryStatus buttons; 
